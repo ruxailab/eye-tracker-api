@@ -40,9 +40,86 @@ pip install -r requirements.txt
 flask run
 ```
 
+---
+
+## 💻 Setup for macOS / Linux
+
+The following steps provide instructions for setting up the **Eye Lab API** on **macOS** and **Linux**.
+
+### For macOS / Linux
+
+1. **Install Python 3 and pip**
+
+   - On **macOS**:
+     macOS usually comes with **Python 3** pre-installed. You can check by running:
+
+     ```bash
+     python3 --version
+     ```
+
+     If it's not installed, you can install **Python 3** via [Homebrew](https://brew.sh/). First, install **Homebrew** (if you don't have it) with:
+
+     ```bash
+     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+     ```
+
+     Then install **Python 3**:
+
+     ```bash
+     brew install python
+     ```
+
+   - On **Linux**:
+     Use the following commands to install **Python 3** and **pip** on Ubuntu or other Debian-based systems:
+
+     ```bash
+     sudo apt update
+     sudo apt install python3 python3-pip
+     ```
+
+     Alternatively, if you want to manage different Python versions, you can use [pyenv](https://github.com/pyenv/pyenv).
+
+2. **Create a virtual environment**
+
+   It's best to create a virtual environment to isolate your dependencies.
+
+   ```bash
+   python3 -m venv venv
+   ```
+
+3. **Activate the virtual environment**
+
+   Once the virtual environment is created, activate it.
+
+   - On **macOS/Linux**:
+
+     ```bash
+     source venv/bin/activate
+     ```
+
+4. **Install the dependencies**
+
+   Once the virtual environment is activated, install the required dependencies from `requirements.txt`:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+5. **Run the Flask API**
+
+   To run the Flask API, use the following command:
+
+   ```bash
+   flask run
+   ```
+
+   By default, this will start the Flask server at `http://127.0.0.1:5000/`.
+
+---
+
 ## 🧑‍🤝‍🧑 Contributing
 
-Anyone is free to contribute to this project. Just do a pull request with your code and if it is all good we will accept it. You can also help us look for bugs, if you find anything create and issue.
+Anyone is free to contribute to this project. Just do a pull request with your code and if it is all good we will accept it. You can also help us look for bugs, if you find anything create an issue.
 
 ## 📃 License
 
