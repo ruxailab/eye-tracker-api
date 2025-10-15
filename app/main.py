@@ -70,6 +70,10 @@ def calib_validation():
     """
     if request.method == "POST":
         return session_route.calib_results()
-    return Response(
-        "Invalid request method for route", status=405, mimetype="application/json"
-    )
+    return Response('Invalid request method for route', status=405, mimetype='application/json')
+
+@app.route('/api/session/batch_predict', methods=['POST'])
+def batch_predict():
+    if request.method == 'POST':
+        return session_route.batch_predict()
+    return Response('Invalid request method for route', status=405, mimetype='application/json')
