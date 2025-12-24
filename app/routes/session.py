@@ -169,6 +169,7 @@ def calib_results():
 
     # Generate csv of calibration points with following columns
     calib_csv_file = f"{Path().absolute()}/app/services/calib_validation/csv/data/{file_name}_fixed_train_data.csv"
+    calib_csv_filename = Path(calib_csv_file).name
     csv_columns = [
         "left_iris_x",
         "left_iris_y",
@@ -234,7 +235,8 @@ def calib_results():
             print("Enviado para RuxaiLab:", resp.status_code, resp.text)
         except Exception as e:
             print("Erro ao enviar para RuxaiLab:", e)
-
+    
+    data["calibration_csv_filename"] = calib_csv_filename
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 def batch_predict():
