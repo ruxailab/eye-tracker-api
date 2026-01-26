@@ -1,5 +1,8 @@
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, join_room, emit
+from collections import defaultdict
+import time
 
 # Local imports from app
 from app.routes import session as session_route
@@ -9,6 +12,7 @@ from app.routes import session as session_route
 app = Flask(__name__)
 CORS(app)
 
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # @app.route('/', methods=['GET'])
 # def welcome():
@@ -77,3 +81,41 @@ def batch_predict():
     if request.method == 'POST':
         return session_route.batch_predict()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
+
+# TODO: replace with persistent storage for replay & analytics
+gaze_buffer = defaultdict(list)
+
+@socketio.on("join_session")
+def handle_join(data):
+    session_id = data.get("session_id")
+    if session_id:
+        join_room(session_id)
+        emit("joined", {"session_id": session_id})
+
+@app.route("/api/session/gaze", methods=["POST"])
+def ingest_gaze():
+    data = request.get_json()
+
+    session_id = data.get("session_id")
+    x = data.get("x")
+    y = data.get("y")
+    timestamp = data.get("timestamp", time.time())
+
+    if not session_id or x is None or y is None:
+        return Response("Invalid payload", status=400)
+
+    point = {
+        "x": x,
+        "y": y,
+        "timestamp": timestamp
+    }
+
+    gaze_buffer[session_id].append(point)
+
+    socketio.emit("gaze_point", point, room=session_id)
+
+    return jsonify({"status": "ok"})
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5000)
+
