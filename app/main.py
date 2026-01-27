@@ -88,13 +88,18 @@ gaze_buffer = defaultdict(list)
 @socketio.on("join_session")
 def handle_join(data):
     session_id = data.get("session_id")
+    print("OBSERVER JOIN:", session_id, flush=True)
     if session_id:
         join_room(session_id)
         emit("joined", {"session_id": session_id})
 
+
 @app.route("/api/session/gaze", methods=["POST"])
-def ingest_gaze():
+def receive_gaze():
     data = request.get_json()
+
+    if not data:
+        return Response("Invalid JSON", status=400)
 
     session_id = data.get("session_id")
     x = data.get("x")
@@ -105,13 +110,17 @@ def ingest_gaze():
         return Response("Invalid payload", status=400)
 
     point = {
+        "session_id": session_id,
         "x": x,
         "y": y,
-        "timestamp": timestamp
+        "timestamp": timestamp,
+        "phase": data.get("phase"),
     }
 
-    gaze_buffer[session_id].append(point)
+    print("GAZE:", point, flush=True)
 
+    # store for replay later
+    gaze_buffer[session_id].append(point)
     socketio.emit("gaze_point", point, room=session_id)
 
     return jsonify({"status": "ok"})
