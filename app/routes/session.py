@@ -1,6 +1,7 @@
 # Necesary imports
 import os
 import re
+import uuid
 import time
 import json
 import csv
@@ -21,6 +22,7 @@ from app.models.session import Session
 
 # from app.services import database as db
 from app.services import gaze_tracker
+from app.services import heatmap as heatmap_service
 
 
 # Constants
@@ -148,11 +150,13 @@ def calib_results():
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 def batch_predict():
+    predict_csv_path = None
     try:
         data = request.get_json()
         iris_data = data["iris_tracking_data"]
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
+        # model_X and model_Y are retrieved but not currently used in the simple predictor
         model_X = data.get("model_X", "Linear Regression")
         model_Y = data.get("model_Y", "Linear Regression")
         calib_id = data.get("calib_id")
@@ -162,9 +166,12 @@ def batch_predict():
 
         base_path = Path().absolute() / "app/services/calib_validation/csv/data"
         calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / "temp_batch_predict.csv"
+        
+        # Use UUID to ensure unique filename for each request (prevent concurrency issues)
+        unique_id = str(uuid.uuid4())
+        predict_csv_path = base_path / f"temp_batch_predict_{unique_id}.csv"
 
-        # CSV temporário
+        # Write temporary CSV
         with open(predict_csv_path, "w", newline="") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=[
                 "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
@@ -178,19 +185,35 @@ def batch_predict():
                     "right_iris_y": item["right_iris_y"],
                 })
 
+        # require screen dims for correct normalization and heatmap
+        if screen_width is None or screen_height is None:
+            return Response("Missing screen_width or screen_height", status=400)
+
         result = gaze_tracker.predict_new_data_simple(
             calib_csv_path=calib_csv_path,
             predict_csv_path=predict_csv_path,
             iris_data=iris_data,
-            # model_X="Random Forest Regressor",
-            # model_Y="Random Forest Regressor",
             screen_width=screen_width,
             screen_height=screen_height,
         )
+        
+        # attach a lightweight heatmap array if possible
+        try:
+            result_with_heat = heatmap_service.attach_heatmap_to_payload(result)
+        except Exception:
+            result_with_heat = result
 
-        return jsonify(convert_nan_to_none(result))
+        return jsonify(convert_nan_to_none(result_with_heat))
 
     except Exception as e:
         print("Erro batch_predict:", e)
         traceback.print_exc()
         return Response("Erro interno", status=500)
+        
+    finally:
+        # Clean up temporary file
+        if predict_csv_path and predict_csv_path.exists():
+            try:
+                predict_csv_path.unlink()
+            except Exception:
+                pass

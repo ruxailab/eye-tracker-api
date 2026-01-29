@@ -398,38 +398,65 @@ def predict_new_data_simple(
     predictions = []
 
     for i in range(len(y_pred_x)):
-        # baseline dinâmico
+        # dynamic baseline
         ref_mean_x = BASELINE_ALPHA * mean_px[i] + (1 - BASELINE_ALPHA) * ref_mean_x
         ref_mean_y = BASELINE_ALPHA * mean_py[i] + (1 - BASELINE_ALPHA) * ref_mean_y
 
-        # squash não-linear
+        # non-linear squash
         sx = squash(y_pred_x[i], SQUASH_LIMIT_X)
         sy = squash(y_pred_y[i], SQUASH_LIMIT_Y)
 
         px = x_center + float(sx) * x_scale
         py = y_center + float(sy) * y_scale
 
+        # normalized coordinates (0..1) when screen dims provided
+        x_norm = None
+        y_norm = None
+        if screen_width and screen_height:
+            try:
+                x_norm = float(px) / float(screen_width)
+                y_norm = float(py) / float(screen_height)
+            except Exception:
+                x_norm = None
+                y_norm = None
+
+        # simple confidence heuristic based on normalized vertical iris difference
+        conf = None
+        try:
+            conf = float(np.exp(-np.abs(diff_py_norm[i])))
+            conf = max(0.0, min(1.0, conf))
+        except Exception:
+            conf = 1.0
+
         predictions.append({
             "timestamp": iris_data[i].get("timestamp"),
-            "predicted_x": px,
-            "predicted_y": py,
-            "screen_width": screen_width,
-            "screen_height": screen_height,
+            "x": float(px),
+            "y": float(py),
+            "x_norm": x_norm,
+            "y_norm": y_norm,
+            "confidence": conf,
         })
 
     # ============================
     # LOGS
     # ============================
-    print("====== MODEL DEBUG ======")
-    print(f"y_pred_x: {np.min(y_pred_x):.3f} → {np.max(y_pred_x):.3f}")
-    print(f"y_pred_y: {np.min(y_pred_y):.3f} → {np.max(y_pred_y):.3f}")
-    print("=========================")
+    try:
+        print("====== MODEL DEBUG ======")
+        print(f"y_pred_x: {np.min(y_pred_x):.3f} → {np.max(y_pred_x):.3f}")
+        print(f"y_pred_y: {np.min(y_pred_y):.3f} → {np.max(y_pred_y):.3f}")
+        print("=========================")
+    except Exception:
+        pass
 
-    print("====== PIXEL SAMPLE ======")
-    for p in predictions[:15]:
-        print(f"x: {p['predicted_x']:.1f}, y: {p['predicted_y']:.1f}")
+    # Top-level unified payload for visualizers
+    payload = {
+        "screen": {"width": screen_width, "height": screen_height},
+        "predictions": predictions,
+        "normalized": bool(screen_width and screen_height),
+        "heatmap": None,
+    }
 
-    return predictions
+    return payload
 
 
 def normalizeData(data):
