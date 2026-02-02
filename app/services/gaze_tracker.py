@@ -1,4 +1,5 @@
 # Necessary imports
+import math
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -10,6 +11,9 @@ from pathlib import Path
 # Scikit-learn imports
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
 
 # Model imports
@@ -54,7 +58,14 @@ models = {
     "Support Vector Regressor": make_pipeline(
         PolynomialFeatures(2), SVR(kernel="linear")
     ),
-}
+    "Random Forest Regressor": make_pipeline(
+    RandomForestRegressor(
+        n_estimators=200, 
+        max_depth=10, 
+        min_samples_split=5,
+        random_state=42
+    )
+)}
 
 # Set the scoring metrics for GridSearchCV to r2_score and mean_absolute_error
 scoring = {
@@ -62,6 +73,10 @@ scoring = {
     "mae": make_scorer(mean_absolute_error),
 }
 
+
+def squash(v, limit=1.0):
+    """Squash não-linear estilo WebGazer"""
+    return np.tanh(v / limit)
 
 def predict(data, k, model_X, model_Y):
     """
@@ -235,213 +250,186 @@ def predict(data, k, model_X, model_Y):
     # Return the data
     return data
 
-def predict_new_data_simple(calib_csv_path, predict_csv_path, model_X, model_Y, k=3):
-    """
-    Versão simplificada de predict_new_data.
-    Treina modelos nos dados de calibração e prevê coordenadas nos novos dados.
-    Retorna o mesmo formato que a função `predict`.
-    """
-    # -------------------- SCALERS --------------------
-    sc_x = StandardScaler()
-    sc_y = StandardScaler()
 
-    # -------------------- TREINO --------------------
-    df_train = pd.read_csv(calib_csv_path).drop(["screen_height", "screen_width"], axis=1)
+def predict_new_data_simple(
+    calib_csv_path,
+    predict_csv_path,
+    iris_data,
+    screen_width=None,
+    screen_height=None,
+):
+    # ============================
+    # CONFIG (WebGazer-inspired)
+    # ============================
+    BASELINE_ALPHA = 0.01
+    SQUASH_LIMIT_X = 1.0
+    SQUASH_LIMIT_Y = 1.0
+    Y_GAIN = 1.2  # adjustment to compensate for vertical bias
 
-    X_train_x = df_train[["left_iris_x", "right_iris_x"]].values
-    y_train_x = df_train["point_x"].values
-    X_train_y = df_train[["left_iris_y", "right_iris_y"]].values
-    y_train_y = df_train["point_y"].values
+    # ============================
+    # LOAD TRAIN
+    # ============================
+    df_train = pd.read_csv(calib_csv_path)
 
-    X_train_x_scaled = sc_x.fit_transform(X_train_x)
-    X_train_y_scaled = sc_y.fit_transform(X_train_y)
+    x_center = screen_width / 2
+    y_center = screen_height / 2
 
-    # Modelos
-    model_fit_x = clone(models[model_X]).fit(X_train_x_scaled, y_train_x)
-    model_fit_y = clone(models[model_Y]).fit(X_train_y_scaled, y_train_y)
-    # -------------------- NOVOS DADOS --------------------
-    df_predict = pd.read_csv(predict_csv_path)
-    X_pred_x = sc_x.transform(df_predict[["left_iris_x", "right_iris_x"]].values)
-    X_pred_y = sc_y.transform(df_predict[["left_iris_y", "right_iris_y"]].values)
+    # normalize targets to [-1, 1] space
+    y_train_x = (df_train["point_x"].values.astype(float) - x_center) / (screen_width / 2)
+    y_train_y = (df_train["point_y"].values.astype(float) - y_center) / (screen_height / 2)
 
-    y_pred_x = model_fit_x.predict(X_pred_x)
-    y_pred_y = model_fit_y.predict(X_pred_y)
+    # ensure laterality
+    if df_train["left_iris_x"].mean() < df_train["right_iris_x"].mean():
+        df_train["left_iris_x"], df_train["right_iris_x"] = (
+            df_train["right_iris_x"].copy(),
+            df_train["left_iris_x"].copy(),
+        )
+    if df_train["left_iris_y"].mean() < df_train["right_iris_y"].mean():
+        df_train["left_iris_y"], df_train["right_iris_y"] = (
+            df_train["right_iris_y"].copy(),
+            df_train["left_iris_y"].copy(),
+        )
 
-    # Garantir valores não-negativos
-    y_pred_x = np.clip(y_pred_x, 0, None)
-    y_pred_y = np.clip(y_pred_y, 0, None)
+    left_x = df_train["left_iris_x"].values.astype(float)
+    right_x = df_train["right_iris_x"].values.astype(float)
+    left_y = df_train["left_iris_y"].values.astype(float)
+    right_y = df_train["right_iris_y"].values.astype(float)
 
-    # -------------------- KMEANS --------------------
-    data_pred = np.array([y_pred_x, y_pred_y]).T
-    kmeans_model = KMeans(n_clusters=k, n_init="auto", init="k-means++")
-    y_kmeans = kmeans_model.fit_predict(data_pred)
+    mean_x = (left_x + right_x) / 2
+    diff_x = left_x - right_x
+    mean_y = (left_y + right_y) / 2
+    diff_y = left_y - right_y
 
-    # -------------------- FORMATA DADOS --------------------
-    df_data = pd.DataFrame({
-        "Predicted X": y_pred_x,
-        "Predicted Y": y_pred_y,
-        "True X": df_predict["point_x"] if "point_x" in df_predict else y_pred_x,
-        "True Y": df_predict["point_y"] if "point_y" in df_predict else y_pred_y
-    })
+    # baseline inicial (WebGazer)
+    ref_mean_x = np.mean(mean_x)
+    ref_mean_y = np.mean(mean_y)
 
-    # Calcular métricas
-    precision_x = df_data.groupby(["True X", "True Y"]).apply(func_precision_x)
-    precision_y = df_data.groupby(["True X", "True Y"]).apply(func_presicion_y)
-    precision_xy = (precision_x + precision_y) / 2
-    precision_xy /= np.mean(precision_xy)
+    rel_x = mean_x - ref_mean_x
+    rel_y = mean_y - ref_mean_y
 
-    accuracy_x = df_data.groupby(["True X", "True Y"]).apply(func_accuracy_x)
-    accuracy_y = df_data.groupby(["True X", "True Y"]).apply(func_accuracy_y)
-    accuracy_xy = (accuracy_x + accuracy_y) / 2
-    accuracy_xy /= np.mean(accuracy_xy)
+    # ============================
+    # PHYSICAL NORMALIZATION Y
+    # ============================
+    iris_y_scale = np.std(mean_y) + 1e-6
+    diff_y_norm = diff_y / iris_y_scale
+    rel_y_norm = rel_y / iris_y_scale
 
-    # Estrutura final
-    data = {}
-    for index, row in df_data.iterrows():
-        outer_key = str(int(row["True X"]))
-        inner_key = str(int(row["True Y"]))
-        if outer_key not in data:
-            data[outer_key] = {}
-        data[outer_key][inner_key] = {
-            "predicted_x": df_data[
-                (df_data["True X"] == row["True X"]) &
-                (df_data["True Y"] == row["True Y"])
-            ]["Predicted X"].tolist(),
-            "predicted_y": df_data[
-                (df_data["True X"] == row["True X"]) &
-                (df_data["True Y"] == row["True Y"])
-            ]["Predicted Y"].tolist(),
-            "PrecisionSD": precision_xy[(row["True X"], row["True Y"])],
-            "Accuracy": accuracy_xy[(row["True X"], row["True Y"])],
-        }
+    # ============================
+    # FEATURES
+    # ============================
+    X_train_x = np.column_stack([
+        left_x, right_x, mean_x, diff_x, rel_x
+    ])
 
-    data["centroids"] = kmeans_model.cluster_centers_.tolist()
-    return data
+    X_train_y = np.column_stack([
+        diff_y_norm, rel_y_norm
+    ])
 
+    # ============================
+    # MODELS
+    # ============================
+    model_x = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
+    model_y = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
 
-def train_to_validate_calib(calib_csv_file, predict_csv_file):
-    dataset_train_path = calib_csv_file
-    dataset_predict_path = predict_csv_file
+    model_x.fit(X_train_x, y_train_x)
+    model_y.fit(X_train_y, y_train_y)
 
-    # Carregue os dados de treinamento a partir do CSV
-    data = pd.read_csv(dataset_train_path)
+    # ============================
+    # Real scale (calibration) - normalize predicted values to screen coordinates
+    # ============================
+    x_range = np.percentile(y_train_x, 95) - np.percentile(y_train_x, 5)
+    y_range = np.percentile(y_train_y, 95) - np.percentile(y_train_y, 5)
 
-    # Para evitar que retorne valores negativos: Aplicar uma transformação logarítmica aos rótulos (point_x e point_y)
-    # data['point_x'] = np.log(data['point_x'])
-    # data['point_y'] = np.log(data['point_y'])
+    x_scale = max(x_range / 2, 1e-6) * (screen_width / 2)
+    y_scale = max(y_range / 2, 1e-6) * (screen_height / 2)
 
-    # Separe os recursos (X) e os rótulos (y)
-    X = data[["left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"]]
-    y = data[["point_x", "point_y"]]
+    # ============================
+    # LOAD PREDICT
+    # ============================
+    df_pred = pd.read_csv(predict_csv_path)
 
-    # Crie e ajuste um modelo de regressão linear
-    model = linear_model.LinearRegression()
-    model.fit(X, y)
+    if df_pred["left_iris_x"].mean() < df_pred["right_iris_x"].mean():
+        df_pred["left_iris_x"], df_pred["right_iris_x"] = (
+            df_pred["right_iris_x"].copy(),
+            df_pred["left_iris_x"].copy(),
+        )
+    if df_pred["left_iris_y"].mean() < df_pred["right_iris_y"].mean():
+        df_pred["left_iris_y"], df_pred["right_iris_y"] = (
+            df_pred["right_iris_y"].copy(),
+            df_pred["left_iris_y"].copy(),
+        )
 
-    # Carregue os dados de teste a partir de um novo arquivo CSV
-    dados_teste = pd.read_csv(dataset_predict_path)
+    left_px = df_pred["left_iris_x"].values.astype(float)
+    right_px = df_pred["right_iris_x"].values.astype(float)
+    left_py = df_pred["left_iris_y"].values.astype(float)
+    right_py = df_pred["right_iris_y"].values.astype(float)
 
-    # Faça previsões
-    previsoes = model.predict(dados_teste)
+    mean_px = (left_px + right_px) / 2
+    diff_px = left_px - right_px
+    mean_py = (left_py + right_py) / 2
+    diff_py = left_py - right_py
 
-    # Para evitar que retorne valores negativos: Inverter a transformação logarítmica nas previsões
-    # previsoes = np.exp(previsoes)
+    # baseline relativo
+    rel_px = mean_px - ref_mean_x
+    rel_py = mean_py - ref_mean_y
 
-    # Exiba as previsões
-    print("Previsões de point_x e point_y:")
-    print(previsoes)
-    return previsoes.tolist()
+    diff_py_norm = diff_py / iris_y_scale
+    rel_py_norm = rel_py / iris_y_scale
 
+    X_pred_x = np.column_stack([
+        left_px, right_px, mean_px, diff_px, rel_px
+    ])
 
-def train_model(session_id):
-    # Download dataset
-    dataset_train_path = (
-        f"{Path().absolute()}/public/training/{session_id}/train_data.csv"
-    )
-    dataset_session_path = (
-        f"{Path().absolute()}/public/sessions/{session_id}/session_data.csv"
-    )
+    X_pred_y = np.column_stack([
+        diff_py_norm, rel_py_norm
+    ])
 
-    # Importing data from csv
-    raw_dataset = pd.read_csv(dataset_train_path)
-    session_dataset = pd.read_csv(dataset_session_path)
+    y_pred_x = model_x.predict(X_pred_x)
+    y_pred_y = model_y.predict(X_pred_y)
 
-    train_stats = raw_dataset.describe()
-    train_stats = train_stats.transpose()
+    # remove bias vertical
+    y_pred_y = y_pred_y - np.mean(y_pred_y)
+    
+    y_pred_y = y_pred_y * Y_GAIN
 
-    dataset_t = raw_dataset
-    dataset_s = session_dataset.drop(["timestamp"], axis=1)
+    # ============================
+    # PREDICTION LOOP (WebGazer)
+    # ============================
+    predictions = []
 
-    # Drop the columns that will be predicted
-    X = dataset_t.drop(["timestamp", "mouse_x", "mouse_y"], axis=1)
+    for i in range(len(y_pred_x)):
+        # baseline dinâmico
+        ref_mean_x = BASELINE_ALPHA * mean_px[i] + (1 - BASELINE_ALPHA) * ref_mean_x
+        ref_mean_y = BASELINE_ALPHA * mean_py[i] + (1 - BASELINE_ALPHA) * ref_mean_y
 
-    Y1 = dataset_t.mouse_x
-    Y2 = dataset_t.mouse_y
-    # print('Y1 is the mouse_x column ->', Y1)
-    # print('Y2 is the mouse_y column ->', Y2)
+        # squash não-linear
+        sx = squash(y_pred_x[i], SQUASH_LIMIT_X)
+        sy = squash(y_pred_y[i], SQUASH_LIMIT_Y)
 
-    MODEL_X = model_for_mouse_x(X, Y1)
-    MODEL_Y = model_for_mouse_y(X, Y2)
+        px = x_center + float(sx) * x_scale
+        py = y_center + float(sy) * y_scale
 
-    GAZE_X = MODEL_X.predict(dataset_s)
-    GAZE_Y = MODEL_Y.predict(dataset_s)
+        predictions.append({
+            "timestamp": iris_data[i].get("timestamp"),
+            "predicted_x": px,
+            "predicted_y": py,
+            "screen_width": screen_width,
+            "screen_height": screen_height,
+        })
 
-    GAZE_X = np.abs(GAZE_X)
-    GAZE_Y = np.abs(GAZE_Y)
+    # ============================
+    # LOGS
+    # ============================
+    print("====== MODEL DEBUG ======")
+    print(f"y_pred_x: {np.min(y_pred_x):.3f} → {np.max(y_pred_x):.3f}")
+    print(f"y_pred_y: {np.min(y_pred_y):.3f} → {np.max(y_pred_y):.3f}")
+    print("=========================")
 
-    return {"x": GAZE_X, "y": GAZE_Y}
+    print("====== PIXEL SAMPLE ======")
+    for p in predictions[:15]:
+        print(f"x: {p['predicted_x']:.1f}, y: {p['predicted_y']:.1f}")
 
-
-def model_for_mouse_x(X, Y1):
-    print("-----------------MODEL FOR X------------------")
-    # split dataset into train and test sets (80/20 where 20 is for test)
-    X_train, X_test, Y1_train, Y1_test = train_test_split(X, Y1, test_size=0.2)
-
-    model = linear_model.LinearRegression()
-    model.fit(X_train, Y1_train)
-
-    Y1_pred_train = model.predict(X_train)
-    Y1_pred_test = model.predict(X_test)
-
-    Y1_test = normalizeData(Y1_test)
-    Y1_pred_test = normalizeData(Y1_pred_test)
-
-    print(f"Mean absolute error MAE = {mean_absolute_error(Y1_test, Y1_pred_test)}")
-    print(f"Mean squared error MSE = {mean_squared_error(Y1_test, Y1_pred_test)}")
-    print(
-        f"Mean squared log error MSLE = {mean_squared_log_error(Y1_test, Y1_pred_test)}"
-    )
-    print(f"MODEL X SCORE R2 = {model.score(X, Y1)}")
-
-    # print(f'TRAIN{Y1_pred_train}')
-    # print(f'TEST{Y1_pred_test}')
-    return model
-
-
-def model_for_mouse_y(X, Y2):
-    print("-----------------MODEL FOR Y------------------")
-    # split dataset into train and test sets (80/20 where 20 is for test)
-    X_train, X_test, Y2_train, Y2_test = train_test_split(X, Y2, test_size=0.2)
-
-    model = linear_model.LinearRegression()
-    model.fit(X_train, Y2_train)
-
-    Y2_pred_train = model.predict(X_train)
-    Y2_pred_test = model.predict(X_test)
-
-    Y2_test = normalizeData(Y2_test)
-    Y2_pred_test = normalizeData(Y2_pred_test)
-
-    print(f"Mean absolute error MAE = {mean_absolute_error(Y2_test, Y2_pred_test)}")
-    print(f"Mean squared error MSE = {mean_squared_error(Y2_test, Y2_pred_test)}")
-    print(
-        f"Mean squared log error MSLE = {mean_squared_log_error(Y2_test, Y2_pred_test)}"
-    )
-    print(f"MODEL X SCORE R2 = {model.score(X, Y2)}")
-
-    # print(f'TRAIN{Y2_pred_train}')
-    print(f"TEST{Y2_pred_test}")
-    return model
+    return predictions
 
 
 def normalizeData(data):
