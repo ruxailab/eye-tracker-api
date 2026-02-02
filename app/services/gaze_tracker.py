@@ -2,7 +2,7 @@
 import warnings
 
 warnings.filterwarnings("ignore")
-
+from sklearn.base import clone
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -257,9 +257,8 @@ def predict_new_data_simple(calib_csv_path, predict_csv_path, model_X, model_Y, 
     X_train_y_scaled = sc_y.fit_transform(X_train_y)
 
     # Modelos
-    model_fit_x = models[model_X].fit(X_train_x_scaled, y_train_x)
-    model_fit_y = models[model_Y].fit(X_train_y_scaled, y_train_y)
-
+    model_fit_x = clone(models[model_X]).fit(X_train_x_scaled, y_train_x)
+    model_fit_y = clone(models[model_Y]).fit(X_train_y_scaled, y_train_y)
     # -------------------- NOVOS DADOS --------------------
     df_predict = pd.read_csv(predict_csv_path)
     X_pred_x = sc_x.transform(df_predict[["left_iris_x", "right_iris_x"]].values)

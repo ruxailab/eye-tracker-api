@@ -273,7 +273,7 @@ def batch_predict():
                 })
 
         # Chama a função de predição corretamente
-        predictions_raw = gaze_tracker.predict_new_data(
+        predictions_raw = gaze_tracker.predict_new_data_simple(
             calib_csv_path,
             predict_csv_path,
             model_X,
