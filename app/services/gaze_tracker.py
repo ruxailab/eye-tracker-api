@@ -92,21 +92,33 @@ def predict(data, k, model_X, model_Y):
         dict: A dictionary containing the predicted gaze coordinates, precision, accuracy, and cluster centroids.
     """
     # Inicialize standard scaler
-    sc = StandardScaler()
+    sc_x = StandardScaler()
+    sc_y = StandardScaler()
 
     # Load data from csv file and drop unnecessary columns
     df = pd.read_csv(data)
     df = df.drop(["screen_height", "screen_width"], axis=1)
+    
+    # Drop rows with NaN values to prevent sklearn errors
+    df = df.dropna()
+
+    # Create a stratification key based on (point_x, point_y) to ensure all calibration
+    # points are represented in both training and test sets
+    df["stratify_key"] = df["point_x"].astype(str) + "_" + df["point_y"].astype(str)
+    
+    # Perform a single stratified split to ensure all points are in both train and test sets
+    train_indices, test_indices = train_test_split(
+        df.index, test_size=0.2, random_state=42, stratify=df["stratify_key"]
+    )
+    
+    df_train = df.loc[train_indices]
+    df_test = df.loc[test_indices]
 
     # Data for X axis
-    X_x = df[["left_iris_x", "right_iris_x"]]
-    X_y = df["point_x"]
-
-    # Normalize data using standard scaler and split data into training and testing sets
-    X_x = sc.fit_transform(X_x)
-    X_train_x, X_test_x, y_train_x, y_test_x = train_test_split(
-        X_x, X_y, test_size=0.2, random_state=42
-    )
+    X_x_train = sc_x.fit_transform(df_train[["left_iris_x", "right_iris_x"]])
+    X_x_test = sc_x.transform(df_test[["left_iris_x", "right_iris_x"]])
+    y_train_x = df_train["point_x"]
+    y_test_x = df_test["point_x"]
 
     if (
         model_X == "Linear Regression"
@@ -116,8 +128,8 @@ def predict(data, k, model_X, model_Y):
         model = models[model_X]
 
         # Fit the model and make predictions
-        model.fit(X_train_x, y_train_x)
-        y_pred_x = model.predict(X_test_x)
+        model.fit(X_x_train, y_train_x)
+        y_pred_x = model.predict(X_x_test)
 
     else:
         pipeline = models[model_X]
@@ -134,21 +146,17 @@ def predict(data, k, model_X, model_Y):
         )
 
         # Fit the GridSearchCV to the training data for X
-        grid_search.fit(X_train_x, y_train_x)
+        grid_search.fit(X_x_train, y_train_x)
 
         # Use the best estimator to predict the values and calculate the R2 score
         best_model_x = grid_search.best_estimator_
-        y_pred_x = best_model_x.predict(X_test_x)
+        y_pred_x = best_model_x.predict(X_x_test)
 
-    # Data for Y axis
-    X_y = df[["left_iris_y", "right_iris_y"]]
-    y_y = df["point_y"]
-
-    # Normalize data using standard scaler and split data into training and testing sets
-    X_y = sc.fit_transform(X_y)
-    X_train_y, X_test_y, y_train_y, y_test_y = train_test_split(
-        X_y, y_y, test_size=0.2, random_state=42
-    )
+    # Data for Y axis (use same train/test split as X for consistency)
+    X_y_train = sc_y.fit_transform(df_train[["left_iris_y", "right_iris_y"]])
+    X_y_test = sc_y.transform(df_test[["left_iris_y", "right_iris_y"]])
+    y_train_y = df_train["point_y"]
+    y_test_y = df_test["point_y"]
 
     if (
         model_Y == "Linear Regression"
@@ -158,8 +166,8 @@ def predict(data, k, model_X, model_Y):
         model = models[model_Y]
 
         # Fit the model and make predictions
-        model.fit(X_train_y, y_train_y)
-        y_pred_y = model.predict(X_test_y)
+        model.fit(X_y_train, y_train_y)
+        y_pred_y = model.predict(X_y_test)
 
     else:
         pipeline = models[model_Y]
@@ -176,11 +184,11 @@ def predict(data, k, model_X, model_Y):
         )
 
         # Fit the GridSearchCV to the training data for X
-        grid_search.fit(X_train_y, y_train_y)
+        grid_search.fit(X_y_train, y_train_y)
 
         # Use the best estimator to predict the values and calculate the R2 score
         best_model_y = grid_search.best_estimator_
-        y_pred_y = best_model_y.predict(X_test_y)
+        y_pred_y = best_model_y.predict(X_y_test)
 
     # Convert the predictions to a numpy array and apply KMeans clustering
     data = np.array([y_pred_x, y_pred_y]).T
