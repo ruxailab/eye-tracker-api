@@ -115,8 +115,8 @@ def predict(data, k, model_X, model_Y):
     df_test = df.loc[test_indices]
 
     # Data for X axis
-    X_x_train = sc_x.fit_transform(df_train[["left_iris_x", "right_iris_x"]])
-    X_x_test = sc_x.transform(df_test[["left_iris_x", "right_iris_x"]])
+    X_train_x = sc_x.fit_transform(df_train[["left_iris_x", "right_iris_x"]])
+    X_test_x = sc_x.transform(df_test[["left_iris_x", "right_iris_x"]])
     y_train_x = df_train["point_x"]
     y_test_x = df_test["point_x"]
 
@@ -128,8 +128,8 @@ def predict(data, k, model_X, model_Y):
         model = models[model_X]
 
         # Fit the model and make predictions
-        model.fit(X_x_train, y_train_x)
-        y_pred_x = model.predict(X_x_test)
+        model.fit(X_train_x, y_train_x)
+        y_pred_x = model.predict(X_test_x)
 
     else:
         pipeline = models[model_X]
@@ -146,15 +146,15 @@ def predict(data, k, model_X, model_Y):
         )
 
         # Fit the GridSearchCV to the training data for X
-        grid_search.fit(X_x_train, y_train_x)
+        grid_search.fit(X_train_x, y_train_x)
 
         # Use the best estimator to predict the values and calculate the R2 score
         best_model_x = grid_search.best_estimator_
-        y_pred_x = best_model_x.predict(X_x_test)
+        y_pred_x = best_model_x.predict(X_test_x)
 
     # Data for Y axis (use same train/test split as X for consistency)
-    X_y_train = sc_y.fit_transform(df_train[["left_iris_y", "right_iris_y"]])
-    X_y_test = sc_y.transform(df_test[["left_iris_y", "right_iris_y"]])
+    X_train_y = sc_y.fit_transform(df_train[["left_iris_y", "right_iris_y"]])
+    X_test_y = sc_y.transform(df_test[["left_iris_y", "right_iris_y"]])
     y_train_y = df_train["point_y"]
     y_test_y = df_test["point_y"]
 
@@ -166,8 +166,8 @@ def predict(data, k, model_X, model_Y):
         model = models[model_Y]
 
         # Fit the model and make predictions
-        model.fit(X_y_train, y_train_y)
-        y_pred_y = model.predict(X_y_test)
+        model.fit(X_train_y, y_train_y)
+        y_pred_y = model.predict(X_test_y)
 
     else:
         pipeline = models[model_Y]
@@ -184,11 +184,11 @@ def predict(data, k, model_X, model_Y):
         )
 
         # Fit the GridSearchCV to the training data for X
-        grid_search.fit(X_y_train, y_train_y)
+        grid_search.fit(X_train_y, y_train_y)
 
         # Use the best estimator to predict the values and calculate the R2 score
         best_model_y = grid_search.best_estimator_
-        y_pred_y = best_model_y.predict(X_y_test)
+        y_pred_y = best_model_y.predict(X_test_y)
 
     # Convert the predictions to a numpy array and apply KMeans clustering
     data = np.array([y_pred_x, y_pred_y]).T
