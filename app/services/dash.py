@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from pathlib import Path
 
 # Sklearn imports
 from sklearn import linear_model
@@ -27,8 +28,23 @@ from sklearn.metrics import (
 )
 
 
+# ---------------------------------------------------------------------------
+# Data directory — resolved relative to this file so it works on every OS
+# and regardless of the working directory from which streamlit is launched.
+# ---------------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+data_dir = BASE_DIR / "calib_validation" / "csv" / "data"
+
+# Guard against missing data folder with a clear, actionable error message
+if not data_dir.exists():
+    st.error(
+        f"Data directory not found: `{data_dir}`\n\n"
+        "Please make sure the `calib_validation/csv/data` folder exists "
+        "and contains calibration CSV files."
+    )
+    st.stop()
+
 # Get all the files in the data directory
-data_dir = rf"C:\Users\SITAM MEUR\Desktop\web-eye-tracker-main\web-eye-tracker-main\app\services\calib_validation\csv\data"
 files = os.listdir(data_dir)
 
 # Extract the prefixes from the file names
@@ -46,67 +62,81 @@ st.title("Streamlit Dashboard📊")
 st.subheader("Select from your collected data")
 prefix = st.selectbox("Select the prefix for the calibration data", prefixes)
 
-# Load the dataset
-dataset_train_path = rf"C:\Users\SITAM MEUR\Desktop\web-eye-tracker-main\web-eye-tracker-main\app\services\calib_validation\csv\data\{prefix}_fixed_train_data.csv"
+# Load the dataset — path built with pathlib for cross-platform compatibility
+dataset_train_path = data_dir / f"{prefix}_fixed_train_data.csv"
 try:
     raw_dataset = pd.read_csv(dataset_train_path)
 # File not found error handling
 except FileNotFoundError:
     st.error("File not found. Please make sure the file path is correct.")
+    st.stop()
+else:
+    st.success("Data loaded successfully!")
 
 
-def model_for_mouse_x(X1, Y1, models, model_names):
+def evaluate_models(X, Y, axis_label, models, model_names):
     """
-    Trains multiple models to predict the X coordinate based on the given features and compares their performance.
+    Trains multiple regression models to predict gaze coordinates along one axis
+    and displays a suite of comparison charts via Streamlit.
+
+    Replaces the previous ``model_for_mouse_x`` / ``model_for_mouse_y`` pair,
+    which were near-identical (~120 duplicated lines).  A single generic
+    function now handles both axes, reducing duplication and making future
+    maintenance easier.
 
     Args:
-        - X1 (array-like): The input features.
-        - Y1 (array-like): The target variable (X coordinate).
+        - X (array-like): The input features (iris coordinates).
+        - Y (array-like): The target variable (screen coordinate for this axis).
+        - axis_label (str): Human-readable axis identifier, e.g. ``"X"`` or ``"Y"``.
         - models (list): A list of machine learning models to be trained.
-        - model_names (list): A list of model names corresponding to the models.
+        - model_names (list): A list of model names corresponding to *models*.
 
     Returns: None
     """
-    # Split dataset into train and test sets (80/20 where 20 is for test)
-    X1_train, X1_test, Y1_train, Y1_test = train_test_split(X1, Y1, test_size=0.2)
+    # Split dataset into train and test sets (80/20; fixed seed for reproducibility)
+    X_train, X_test, Y_train, Y_test = train_test_split(
+        X, Y, test_size=0.2, random_state=42
+    )
 
     metrics_list = []
 
     for model, model_name in zip(models, model_names):
         # Train the model
-        model.fit(X1_train, Y1_train)
+        model.fit(X_train, Y_train)
 
         # Predict the target variable for the test set
-        Y1_pred_test = model.predict(X1_test)
+        Y_pred_test = model.predict(X_test)
 
-        # Filter out the negative predicted values
-        non_negative_indices = Y1_pred_test >= 0
-        Y1_pred_test_filtered = Y1_pred_test[non_negative_indices]
-        Y1_test_filtered = Y1_test[non_negative_indices]
+        # Filter out negative predicted values
+        non_negative_indices = Y_pred_test >= 0
+        Y_pred_test_filtered = Y_pred_test[non_negative_indices]
+        Y_test_filtered = Y_test[non_negative_indices]
 
-        # Compute the metrics for the test set with filtered predictions
+        # Compute metrics for the test set with filtered predictions
         metrics_data_test = {
             "Model": model_name,
             "Mean Absolute Error (MAE)": mean_absolute_error(
-                Y1_test_filtered, Y1_pred_test_filtered
+                Y_test_filtered, Y_pred_test_filtered
             ),
             "Median Absolute Error": median_absolute_error(
-                Y1_test_filtered, Y1_pred_test_filtered
+                Y_test_filtered, Y_pred_test_filtered
             ),
             "Mean Squared Error (MSE)": mean_squared_error(
-                Y1_test_filtered, Y1_pred_test_filtered
+                Y_test_filtered, Y_pred_test_filtered
             ),
             "Mean Log Squared Error (MSLE)": mean_squared_log_error(
-                Y1_test_filtered, Y1_pred_test_filtered
+                Y_test_filtered, Y_pred_test_filtered
             ),
             "Root Mean Squared Error (RMSE)": np.sqrt(
-                mean_squared_error(Y1_test_filtered, Y1_pred_test_filtered)
+                mean_squared_error(Y_test_filtered, Y_pred_test_filtered)
             ),
             "Explained Variance Score": explained_variance_score(
-                Y1_test_filtered, Y1_pred_test_filtered
+                Y_test_filtered, Y_pred_test_filtered
             ),
-            "Max Error": max_error(Y1_test_filtered, Y1_pred_test_filtered),
-            "MODEL X SCORE R2": r2_score(Y1_test_filtered, Y1_pred_test_filtered),
+            "Max Error": max_error(Y_test_filtered, Y_pred_test_filtered),
+            f"MODEL {axis_label} SCORE R2": r2_score(
+                Y_test_filtered, Y_pred_test_filtered
+            ),
         }
 
         metrics_list.append(metrics_data_test)
@@ -115,7 +145,7 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     metrics_df_test = pd.DataFrame(metrics_list)
 
     # Display metrics using Streamlit
-    st.subheader("Metrics for the test set - X")
+    st.subheader(f"Metrics for the test set - {axis_label}")
     st.dataframe(metrics_df_test, use_container_width=True)
 
     # Bar charts for visualization
@@ -133,9 +163,9 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     st.subheader("Box Plot of Model Errors")
     errors_df = pd.DataFrame(
         {
-            "Model": np.repeat(model_names, len(Y1_test)),
-            "Actual": np.tile(Y1_test, len(models)),
-            "Predicted": np.concatenate([model.predict(X1_test) for model in models]),
+            "Model": np.repeat(model_names, len(Y_test)),
+            "Actual": np.tile(Y_test, len(models)),
+            "Predicted": np.concatenate([model.predict(X_test) for model in models]),
         }
     )
     errors_df["Error"] = errors_df["Actual"] - errors_df["Predicted"]
@@ -151,9 +181,12 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     # Normalize the metric values for better comparison
     metrics_normalized = metrics_df_test.copy()
     for col in metrics_normalized.columns[1:]:
+        col_min = metrics_normalized[col].min()
+        col_max = metrics_normalized[col].max()
+        denom = col_max - col_min
         metrics_normalized[col] = (
-            metrics_normalized[col] - metrics_normalized[col].min()
-        ) / (metrics_normalized[col].max() - metrics_normalized[col].min())
+            (metrics_normalized[col] - col_min) / denom if denom != 0 else 0
+        )
 
     # Create the radar chart
     fig = go.Figure()
@@ -176,127 +209,9 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     st.plotly_chart(fig)
 
 
-def model_for_mouse_y(X2, Y2, models, model_names):
-    """
-    Trains multiple models to predict the Y coordinate based on the given features and compares their performance.
-
-    Args:
-        - X2 (array-like): The input features.
-        - Y2 (array-like): The target variable (Y coordinate).
-        - models (list): A list of machine learning models to be trained.
-        - model_names (list): A list of model names corresponding to the models.
-
-    Returns: None
-    """
-    # Split dataset into train and test sets (80/20 where 20 is for test)
-    X2_train, X2_test, Y2_train, Y2_test = train_test_split(X2, Y2, test_size=0.2)
-
-    # Initialize empty lists to store the metrics data
-    metrics_list = []
-
-    for model, model_name in zip(models, model_names):
-        # Train the model
-        model.fit(X2_train, Y2_train)
-
-        # Predict the target variable for the test set
-        Y2_pred_test = model.predict(X2_test)
-
-        # Filter out the negative predicted values
-        non_negative_indices = Y2_pred_test >= 0
-        Y2_pred_test_filtered = Y2_pred_test[non_negative_indices]
-        Y2_test_filtered = Y2_test[non_negative_indices]
-
-        # Compute the metrics for the test set with filtered predictions
-        metrics_data_test = {
-            "Model": model_name,
-            "Mean Absolute Error (MAE)": mean_absolute_error(
-                Y2_test_filtered, Y2_pred_test_filtered
-            ),
-            "Median Absolute Error": median_absolute_error(
-                Y2_test_filtered, Y2_pred_test_filtered
-            ),
-            "Mean Squared Error (MSE)": mean_squared_error(
-                Y2_test_filtered, Y2_pred_test_filtered
-            ),
-            "Mean Log Squared Error (MSLE)": mean_squared_log_error(
-                Y2_test_filtered, Y2_pred_test_filtered
-            ),
-            "Root Mean Squared Error (RMSE)": np.sqrt(
-                mean_squared_error(Y2_test_filtered, Y2_pred_test_filtered)
-            ),
-            "Explained Variance Score": explained_variance_score(
-                Y2_test_filtered, Y2_pred_test_filtered
-            ),
-            "Max Error": max_error(Y2_test_filtered, Y2_pred_test_filtered),
-            "MODEL Y SCORE R2": r2_score(Y2_test_filtered, Y2_pred_test_filtered),
-        }
-
-        metrics_list.append(metrics_data_test)
-
-    # Convert metrics data to DataFrame
-    metrics_df_test = pd.DataFrame(metrics_list)
-
-    # Display metrics using Streamlit
-    st.subheader("Metrics for the test set - Y")
-    st.dataframe(metrics_df_test, use_container_width=True)
-
-    # Bar charts for visualization
-    for metric in metrics_df_test.columns[1:]:
-        st.subheader(f"Comparison of {metric}")
-        fig = px.bar(metrics_df_test.set_index("Model"), y=metric)
-        st.plotly_chart(fig)
-
-    # Line chart for visualizing the metrics
-    st.subheader("Line Chart Comparison")
-    fig = px.line(metrics_df_test.set_index("Model"))
-    st.plotly_chart(fig)
-
-    # Box plot for distribution of errors
-    st.subheader("Box Plot of Model Errors")
-    errors_df = pd.DataFrame(
-        {
-            "Model": np.repeat(model_names, len(Y2_test)),
-            "Actual": np.tile(Y2_test, len(models)),
-            "Predicted": np.concatenate([model.predict(X2_test) for model in models]),
-        }
-    )
-    errors_df["Error"] = errors_df["Actual"] - errors_df["Predicted"]
-
-    # Create the box plot
-    st.dataframe(errors_df, use_container_width=True)
-    fig = px.box(errors_df, x="Model", y="Error")
-    st.plotly_chart(fig)
-
-    # Radar chart for model comparison
-    st.subheader("Radar Chart Comparison")
-
-    # Normalize the metric values for better comparison
-    metrics_normalized = metrics_df_test.copy()
-    for col in metrics_normalized.columns[1:]:
-        metrics_normalized[col] = (
-            metrics_normalized[col] - metrics_normalized[col].min()
-        ) / (metrics_normalized[col].max() - metrics_normalized[col].min())
-
-    # Create the radar chart
-    fig = go.Figure()
-    for i in range(len(models)):
-        fig.add_trace(
-            go.Scatterpolar(
-                r=metrics_normalized.iloc[i, 1:].values,
-                theta=metrics_normalized.columns[1:],
-                fill="toself",
-                name=metrics_normalized.iloc[i, 0],
-            )
-        )
-
-    # Update the layout
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 1])), showlegend=True
-    )
-
-    # Display the radar chart
-    st.plotly_chart(fig)
-
+# ---------------------------------------------------------------------------
+# Main dashboard — tabs for raw data and model metrics
+# ---------------------------------------------------------------------------
 
 # Set the title of the app and the tabs
 st.subheader("Eye Tracker Calibration Data Analysis and Prediction")
@@ -399,6 +314,6 @@ with tab2:
     Y1 = raw_dataset.point_x
     Y2 = raw_dataset.point_y
 
-    # Train the models
-    model_for_mouse_x(X1, Y1, models, model_names)
-    model_for_mouse_y(X2, Y2, models, model_names)
+    # Train and evaluate models for both axes using the unified function
+    evaluate_models(X1, Y1, "X", models, model_names)
+    evaluate_models(X2, Y2, "Y", models, model_names)
