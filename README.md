@@ -12,27 +12,34 @@ The project consists of two parts, this repository contains the backend of the a
 
 - [Python 3x](https://www.python.org/downloads/)
 
-## Setting Up a Virtual Environment
+## 🔧 Setting Up a Virtual Environment
 
+Before installing dependencies and running the Flask server, it is recommended to create and activate a Python virtual environment to isolate project dependencies.
 
-#### **Linux & macOS**
-##### **Step 1: Create a virtual environment**
+---
+
+### 🐧 Linux & macOS
+
+#### Step 1: Create a virtual environment
+
 ```sh
 python3 -m venv venv
 ```
 
-
 ##### **Step 2: Activate the virtual environment**
+
 ```sh
 source venv/bin/activate
 ```
 
 ##### **Step 3: Install dependencies**
+
 ```sh
 pip install -r requirements.txt
 ```
 
 ##### **Step 4: Run Flask**
+
 ```sh
 flask run
 ```
@@ -40,22 +47,49 @@ flask run
 ---
 
 #### **Windows**
+
 ##### **Step 1: Create a virtual environment**
+
 ```sh
 python -m venv venv
 ```
 
 ##### **Step 2: Activate the virtual environment**
+
+**PowerShell / CMD**
+
 ```sh
 venv\Scripts\activate
 ```
 
+**Git Bash**
+
+```sh
+source venv/Scripts/activate
+```
+
+**If activation is blocked in PowerShell, run:**
+
+```sh
+Set-ExecutionPolicy Unrestricted -Scope Process
+```
+
 ##### **Step 3: Install dependencies**
+
 ```sh
 pip install -r requirements.txt
 ```
 
+- All required dependencies are installed using `requirements.txt`.
+
+- If you encounter missing modules, install them manually using pip.
+
+```sh
+pip install matplotlib
+```
+
 ##### **Step 4: Run Flask**
+
 ```sh
 flask run
 ```
@@ -65,37 +99,43 @@ flask run
 ### **2. Using Conda (Works on Linux, macOS, and Windows)**
 
 #### **Step 1: Create a Conda virtual environment**
+
 ```sh
 conda create --name flask_env python=3.10
 ```
 
 #### **Step 2: Activate the environment**
+
 ```sh
 conda activate flask_env
 ```
 
 #### **Step 3: Install dependencies**
+
 ```sh
 pip install -r requirements.txt
 ```
 
 #### **Step 4: Run Flask**
+
 ```sh
 flask run
 ```
 
-
 ### **Additional Notes**
+
 - If you face issues running `flask run`, try:
 
   ```sh
   python -m flask run
   ```
+
 - If Flask is not installed, install it manually:
 
   ```sh
   pip install flask
   ```
+
 - On **Windows**, if `venv\Scripts\activate` doesn't work, **run PowerShell as Administrator** and enable scripts:
 
   ```sh
@@ -106,7 +146,6 @@ flask run
 
 Anyone is free to contribute to this project. Just do a pull request with your code and if it is all good we will accept it. You can also help us look for bugs if you find anything that creates an issue.
 To see the full list of contributions, check out the ahead commits of the "develop" branch concerning the "main" branch. Full logs of the project development can be found in the [Daily Work Progress](https://docs.google.com/document/d/1RjCnGjYYgPKvFUrN8hSjPX29aayWr6eEopeCN3QZwEQ/edit?usp=sharing) file. Hoping to see your name in the list of contributors soon! 🚀
-
 
 ## 📃 License
 
