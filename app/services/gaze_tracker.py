@@ -199,29 +199,19 @@ def predict(data, k, model_X, model_Y):
     # Create a dictionary to store the data
     data = {}
 
-    # Iterate over the dataframe and store the data
-    for index, row in df_data.iterrows():
+    # Group once by (True X, True Y) — O(n) instead of O(n²)
+    for (true_x, true_y), group in df_data.groupby("True XY"):
+        outer_key = str(true_x).split(".")[0]
+        inner_key = str(true_y).split(".")[0]
 
-        # Get the outer and inner keys
-        outer_key = str(row["True X"]).split(".")[0]
-        inner_key = str(row["True Y"]).split(".")[0]
-
-        # If the outer key is not in the dictionary, add it
         if outer_key not in data:
             data[outer_key] = {}
 
-        # Add the data to the dictionary
         data[outer_key][inner_key] = {
-            "predicted_x": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted X"].values.tolist(),
-            "predicted_y": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted Y"].values.tolist(),
-            "PrecisionSD": precision_xy[(row["True X"], row["True Y"])],
-            "Accuracy": accuracy_xy[(row["True X"], row["True Y"])],
+            "predicted_x": group["Predicted X"].values.tolist(),
+            "predicted_y": group["Predicted Y"].values.tolist(),
+            "PrecisionSD": precision_xy[(true_x, true_y)],
+            "Accuracy": accuracy_xy[(true_x, true_y)],
         }
 
     # Centroids of the clusters
