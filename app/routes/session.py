@@ -5,6 +5,7 @@ import time
 import json
 import csv
 import math
+import uuid
 import numpy as np
 
 from pathlib import Path
@@ -162,33 +163,37 @@ def batch_predict():
 
         base_path = Path().absolute() / "app/services/calib_validation/csv/data"
         calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / "temp_batch_predict.csv"
+        predict_csv_path = base_path / f"temp_batch_predict_{uuid.uuid4()}.csv"
 
-        # CSV temporário
-        with open(predict_csv_path, "w", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=[
-                "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
-            ])
-            writer.writeheader()
-            for item in iris_data:
-                writer.writerow({
-                    "left_iris_x": item["left_iris_x"],
-                    "left_iris_y": item["left_iris_y"],
-                    "right_iris_x": item["right_iris_x"],
-                    "right_iris_y": item["right_iris_y"],
-                })
+        try:
+            # CSV temporário
+            with open(predict_csv_path, "w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=[
+                    "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
+                ])
+                writer.writeheader()
+                for item in iris_data:
+                    writer.writerow({
+                        "left_iris_x": item["left_iris_x"],
+                        "left_iris_y": item["left_iris_y"],
+                        "right_iris_x": item["right_iris_x"],
+                        "right_iris_y": item["right_iris_y"],
+                    })
 
-        result = gaze_tracker.predict_new_data_simple(
-            calib_csv_path=calib_csv_path,
-            predict_csv_path=predict_csv_path,
-            iris_data=iris_data,
-            # model_X="Random Forest Regressor",
-            # model_Y="Random Forest Regressor",
-            screen_width=screen_width,
-            screen_height=screen_height,
-        )
+            result = gaze_tracker.predict_new_data_simple(
+                calib_csv_path=calib_csv_path,
+                predict_csv_path=predict_csv_path,
+                iris_data=iris_data,
+                # model_X="Random Forest Regressor",
+                # model_Y="Random Forest Regressor",
+                screen_width=screen_width,
+                screen_height=screen_height,
+            )
 
-        return jsonify(convert_nan_to_none(result))
+            return jsonify(convert_nan_to_none(result))
+        finally:
+            if predict_csv_path.exists():
+                os.remove(predict_csv_path)
 
     except Exception as e:
         print("Erro batch_predict:", e)
