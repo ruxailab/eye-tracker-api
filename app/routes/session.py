@@ -177,6 +177,6 @@ def batch_predict():
         return jsonify(convert_nan_to_none(result))
 
     except Exception as e:
-        print("Erro batch_predict:", e)
+
         traceback.print_exc()
         return Response("Erro interno", status=500)

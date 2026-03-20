@@ -77,18 +77,7 @@ def calib_validation():
 
 @app.route('/api/session/batch_predict', methods=['POST'])
 def batch_predict():
-    if request.method == "POST":
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        try:
-            return session_route.batch_predict()
-
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    return jsonify({"error": "Invalid request method"}), 405
+    return session_route.batch_predict()
 
 
 @app.route("/health", methods=["GET"])

@@ -90,7 +90,6 @@ def trian_and_predict(model_name, X_train, y_train, X_test, y_test, label):
         model = models[model_name]
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
-        print(f"Score {label}: {r2_score(y_test, y_pred)}")
         return y_pred
     else:
         pipeline = models[model_name]
@@ -126,7 +125,7 @@ def predict(data, k, model_X, model_Y):
     # Load data from csv file and drop unnecessary columns
     df = pd.read_csv(data)
     df = df.drop(["screen_height", "screen_width"], axis=1)
-    print(df.head())
+
     # Create groups (point_x, point_y)
     df["group"] = list(zip(df["point_x"], df["point_y"]))
 
@@ -405,14 +404,6 @@ def predict_new_data_simple(
     # ============================
     # LOGS
     # ============================
-    print("====== MODEL DEBUG ======")
-    print(f"y_pred_x: {np.min(y_pred_x):.3f} → {np.max(y_pred_x):.3f}")
-    print(f"y_pred_y: {np.min(y_pred_y):.3f} → {np.max(y_pred_y):.3f}")
-    print("=========================")
-
-    print("====== PIXEL SAMPLE ======")
-    for p in predictions[:15]:
-        print(f"x: {p['predicted_x']:.1f}, y: {p['predicted_y']:.1f}")
 
     return predictions
 
