@@ -7,6 +7,7 @@ import csv
 import math
 import numpy as np
 
+
 from pathlib import Path
 import os
 import pandas as pd
@@ -35,10 +36,10 @@ app = Flask(__name__)
 def convert_nan_to_none(obj):
     """
     Recursively converts NaN and Inf values to None for proper JSON serialization.
-    
+
     Args:
         obj: Python object (dict, list, float, etc.)
-    
+
     Returns:
         The object with NaN/Inf values converted to None
     """
@@ -55,8 +56,6 @@ def convert_nan_to_none(obj):
             return None
         return float(obj) if isinstance(obj, np.floating) else int(obj)
     return obj
-
-
 
 
 def calib_results():
@@ -110,7 +109,8 @@ def calib_results():
         f"{Path().absolute()}/app/services/calib_validation/csv/data/", exist_ok=True
     )
     predict_csv_file = f"{Path().absolute()}/app/services/calib_validation/csv/data/{file_name}_predict_train_data.csv"
-    csv_columns = ["left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"]
+    csv_columns = ["left_iris_x", "left_iris_y",
+                   "right_iris_x", "right_iris_y"]
     try:
         with open(predict_csv_file, "w") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
@@ -147,6 +147,7 @@ def calib_results():
     data = convert_nan_to_none(data)
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
+
 def batch_predict():
     try:
         data = request.get_json()
@@ -162,28 +163,13 @@ def batch_predict():
 
         base_path = Path().absolute() / "app/services/calib_validation/csv/data"
         calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / "temp_batch_predict.csv"
 
-        # CSV temporário
-        with open(predict_csv_path, "w", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=[
-                "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
-            ])
-            writer.writeheader()
-            for item in iris_data:
-                writer.writerow({
-                    "left_iris_x": item["left_iris_x"],
-                    "left_iris_y": item["left_iris_y"],
-                    "right_iris_x": item["right_iris_x"],
-                    "right_iris_y": item["right_iris_y"],
-                })
+        df_predict = pd.DataFrame(iris_data)
 
         result = gaze_tracker.predict_new_data_simple(
             calib_csv_path=calib_csv_path,
-            predict_csv_path=predict_csv_path,
+            predict_df=df_predict,
             iris_data=iris_data,
-            # model_X="Random Forest Regressor",
-            # model_Y="Random Forest Regressor",
             screen_width=screen_width,
             screen_height=screen_height,
         )
