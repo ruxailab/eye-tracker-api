@@ -59,6 +59,8 @@ def health_check():
     return jsonify({'status': 'ok'}), 200
 
 # Route for validating calibration
+
+
 @app.route("/api/session/calib_validation", methods=["POST"])
 def calib_validation():
     """
@@ -72,8 +74,12 @@ def calib_validation():
         return session_route.calib_results()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
 
+
 @app.route('/api/session/batch_predict', methods=['POST'])
 def batch_predict():
-    if request.method == 'POST':
-        return session_route.batch_predict()
-    return Response('Invalid request method for route', status=405, mimetype='application/json')
+    return session_route.batch_predict()
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"}), 200
