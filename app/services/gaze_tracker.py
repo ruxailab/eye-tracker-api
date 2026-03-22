@@ -111,15 +111,6 @@ def trian_and_predict(model_name, X_train, y_train, X_test, y_test, label):
 def predict(data, k, model_X, model_Y):
     """
     Predicts the gaze coordinates using machine learning models.
-
-    Args:
-        - data (str): The path to the CSV file containing the training data.
-        - k (int): The number of clusters for KMeans clustering.
-        - model_X: The machine learning model to use for prediction on the X coordinate.
-        - model_Y: The machine learning model to use for prediction on the Y coordinate.
-
-    Returns:
-        dict: A dictionary containing the predicted gaze coordinates, precision, accuracy, and cluster centroids.
     """
 
     # Load data from csv file and drop unnecessary columns
@@ -132,11 +123,11 @@ def predict(data, k, model_X, model_Y):
     # Data for X axis
     X_x = df[["left_iris_x", "right_iris_x"]]
     X_y = df["point_x"]
-    # groups = df["group"]
+
     # Data for Y axis
     X_feature_y = df[["left_iris_y", "right_iris_y"]]
     y_y = df["point_y"]
-    # Split data into training and testing sets then Normalize data using standard scaler
+
     (
         X_train_x, X_test_x,
         y_train_x, y_test_x,
@@ -151,84 +142,72 @@ def predict(data, k, model_X, model_Y):
         random_state=42,
     )
 
-    # Scaling (fit on train only)
+    # Scaling X
     scaler_x = StandardScaler()
     X_train_x = scaler_x.fit_transform(X_train_x)
     X_test_x = scaler_x.transform(X_test_x)
 
     y_pred_x = trian_and_predict(
-        model_X, X_train_x, y_train_x, X_test_x, y_test_x, "X")
+        model_X, X_train_x, y_train_x, X_test_x, y_test_x, "X"
+    )
 
-    # Scaling (fit on train only)
+    # Scaling Y
     scaler_y = StandardScaler()
     X_train_y = scaler_y.fit_transform(X_train_y)
     X_test_y = scaler_y.transform(X_test_y)
 
     y_pred_y = trian_and_predict(
-        model_Y, X_train_y, y_train_y, X_test_y, y_test_y, "Y")
+        model_Y, X_train_y, y_train_y, X_test_y, y_test_y, "Y"
+    )
 
-    # Convert the predictions to a numpy array and apply KMeans clustering
-    data = np.array([y_pred_x, y_pred_y]).T
+    # KMeans clustering
+    pred_data = np.array([y_pred_x, y_pred_y]).T
     model = KMeans(n_clusters=k, n_init="auto", init="k-means++")
-    y_kmeans = model.fit_predict(data)
+    y_kmeans = model.fit_predict(pred_data)
 
-    # Create a dataframe with the truth and predicted values
-    data = {
+    # Create dataframe
+    df_data = pd.DataFrame({
         "True X": y_test_x,
         "Predicted X": y_pred_x,
         "True Y": y_test_y,
         "Predicted Y": y_pred_y,
-    }
-    df_data = pd.DataFrame(data)
+    })
+
     df_data["True XY"] = list(zip(df_data["True X"], df_data["True Y"]))
 
-    # Filter out negative values
-    df_data = df_data[(df_data["Predicted X"] >= 0) &
-                      (df_data["Predicted Y"] >= 0)]
+    # Filter negative values
+    df_data = df_data[
+        (df_data["Predicted X"] >= 0) &
+        (df_data["Predicted Y"] >= 0)
+    ]
 
-    # Calculate the precision and accuracy for each
+    # Metrics
     precision_x = df_data.groupby("True XY").apply(func_precision_x)
     precision_y = df_data.groupby("True XY").apply(func_presicion_y)
-
-    # Calculate the average precision
     precision_xy = (precision_x + precision_y) / 2
-
-    # Calculate the average accuracy (eculidian distance)
     accuracy_xy = df_data.groupby("True XY").apply(func_total_accuracy)
 
-    # Create a dictionary to store the data
-    data = {}
+    result = {}
 
-    # Iterate over the dataframe and store the data
-    for index, row in df_data.iterrows():
+    grouped = df_data.groupby(["True X", "True Y"])
 
-        # Get the outer and inner keys
-        outer_key = str(row["True X"]).split(".")[0]
-        inner_key = str(row["True Y"]).split(".")[0]
+    for (true_x, true_y), group in grouped:
+        outer_key = str(true_x).split(".")[0]
+        inner_key = str(true_y).split(".")[0]
 
-        # If the outer key is not in the dictionary, add it
-        if outer_key not in data:
-            data[outer_key] = {}
+        if outer_key not in result:
+            result[outer_key] = {}
 
-        # Add the data to the dictionary
-        data[outer_key][inner_key] = {
-            "predicted_x": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted X"].values.tolist(),
-            "predicted_y": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted Y"].values.tolist(),
-            "PrecisionSD": precision_xy[(row["True X"], row["True Y"])],
-            "Accuracy": accuracy_xy[(row["True X"], row["True Y"])],
+        result[outer_key][inner_key] = {
+            "predicted_x": group["Predicted X"].tolist(),
+            "predicted_y": group["Predicted Y"].tolist(),
+            "PrecisionSD": precision_xy[(true_x, true_y)],
+            "Accuracy": accuracy_xy[(true_x, true_y)],
         }
 
-    # Centroids of the clusters
-    data["centroids"] = model.cluster_centers_.tolist()
+    result["centroids"] = model.cluster_centers_.tolist()
 
-    # Return the data
-    return data
+    return result
 
 
 def predict_new_data_simple(
