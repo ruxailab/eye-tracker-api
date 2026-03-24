@@ -60,6 +60,26 @@ def convert_nan_to_none(obj):
 
 
 def calib_results():
+    def validate_form_fields(required_fields, form):
+        missing = [f for f in required_fields if f not in form]
+        if missing:
+            return {
+                "error": "Missing required fields",
+                "missing": missing
+            }, 400
+        return None 
+    required_fields = [
+    'from_ruxailab',
+    'file_name',
+    'fixed_circle_iris_points',
+    'calib_circle_iris_points',
+    'screen_height',
+    'screen_width',
+    'k'
+    ]
+    error = validate_form_fields(required_fields, request.form)
+    if error:
+        return error
     from_ruxailab = json.loads(request.form['from_ruxailab'])
     file_name = json.loads(request.form['file_name'])
     fixed_points = json.loads(request.form['fixed_circle_iris_points'])
