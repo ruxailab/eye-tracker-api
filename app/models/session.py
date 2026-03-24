@@ -59,6 +59,6 @@ class Session:
             "screen_record_url": self.screen_record_url,
             "webcam_record_url": self.webcam_record_url,
             "heatmap_url": self.heatmap_url,
-            "callib_points": self.calib_points,
+            "calib_points": self.calib_points,
             "iris_points": self.iris_points,
         }
