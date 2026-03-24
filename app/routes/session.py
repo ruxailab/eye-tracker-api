@@ -13,7 +13,7 @@ import pandas as pd
 import traceback
 import re
 import requests
-from flask import Flask, request, Response, send_file, jsonify
+from flask import request, Response, send_file, jsonify
 
 # Local imports from app
 from app.services.storage import save_file_locally
@@ -26,10 +26,6 @@ from app.services import gaze_tracker
 # Constants
 ALLOWED_EXTENSIONS = {"txt", "webm"}
 COLLECTION_NAME = "session"
-
-# Initialize Flask app
-app = Flask(__name__)
-
 
 # Helper function to convert NaN values to None for JSON serialization
 def convert_nan_to_none(obj):
