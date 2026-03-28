@@ -14,7 +14,7 @@ import traceback
 import re
 import requests
 from flask import Flask, request, Response, send_file, jsonify
-
+from gaze_processing import classify_gaze_movements
 # Local imports from app
 from app.services.storage import save_file_locally
 from app.models.session import Session
@@ -149,48 +149,17 @@ def calib_results():
 
 def batch_predict():
     try:
-        data = request.get_json()
-        iris_data = data["iris_tracking_data"]
-        screen_width = data.get("screen_width")
-        screen_height = data.get("screen_height")
-        model_X = data.get("model_X", "Linear Regression")
-        model_Y = data.get("model_Y", "Linear Regression")
-        calib_id = data.get("calib_id")
-
-        if not calib_id:
-            return Response("Missing calib_id", status=400)
-
-        base_path = Path().absolute() / "app/services/calib_validation/csv/data"
-        calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / "temp_batch_predict.csv"
-
-        # CSV temporário
-        with open(predict_csv_path, "w", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=[
-                "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
-            ])
-            writer.writeheader()
-            for item in iris_data:
-                writer.writerow({
-                    "left_iris_x": item["left_iris_x"],
-                    "left_iris_y": item["left_iris_y"],
-                    "right_iris_x": item["right_iris_x"],
-                    "right_iris_y": item["right_iris_y"],
-                })
-
-        result = gaze_tracker.predict_new_data_simple(
-            calib_csv_path=calib_csv_path,
-            predict_csv_path=predict_csv_path,
-            iris_data=iris_data,
-            # model_X="Random Forest Regressor",
-            # model_Y="Random Forest Regressor",
-            screen_width=screen_width,
-            screen_height=screen_height,
-        )
-
-        return jsonify(convert_nan_to_none(result))
+        # --- GAZE MOVEMENT CLASSIFICATION INTEGRATION ---
+        # We try 'results' first, then 'predictions' as a backup.
+        try:
+            enriched_data = classify_gaze_movements(results, threshold=30)
+            return jsonify(convert_nan_to_none(enriched_data))
+        except NameError:
+            enriched_data = classify_gaze_movements(predictions, threshold=30)
+            return jsonify(convert_nan_to_none(enriched_data))
 
     except Exception as e:
-        print("Erro batch_predict:", e)
+        print(f"Error in batch_predict: {e}")
+        import traceback
         traceback.print_exc()
-        return Response("Erro interno", status=500)
+        return Response(f"Internal Server Error: {str(e)}", status=500)
