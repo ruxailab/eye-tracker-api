@@ -13,7 +13,17 @@ The project consists of two parts, this repository contains the backend of the a
 - [Python 3x](https://www.python.org/downloads/)
 
 ## Setting Up a Virtual Environment
+### Virtual Environment Setup
 
+It is highly recommended to run this project inside a Python virtual environment to avoid dependency conflicts. 
+
+**For Windows (Command Prompt / PowerShell):**
+```bash
+# 1. Create the virtual environment
+python -m venv venv
+
+# 2. Activate it
+.\venv\Scripts\activate
 
 #### **Linux & macOS**
 ##### **Step 1: Create a virtual environment**
