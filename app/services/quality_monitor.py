@@ -40,3 +40,40 @@ class QualityMonitor:
         # Root Mean Square calculation
         rms_s2s_px = np.sqrt(np.mean(distances**2))
         return rms_s2s_px
+
+    def process_prediction(self, prediction):
+
+        if not prediction or len(prediction) == 0:
+            return {"status": "no_prediction"}
+        
+        face = prediction[0]
+        annotations = face.get("annotations", {})
+        right_iris = annotations.get("rightEyeIris", [])
+
+        if not right_iris:
+            return {"status": "no_prediction"}
+        
+        right_iris_center = right_iris[0]
+        x_center = right_iris_center[0]
+        y_center = right_iris_center[1]
+
+        self.x_center_coords.append(x_center)
+        self.y_center_coords.append(y_center)
+
+        # Keep only the last N points
+        if len(self.x_center_coords) > self.window_size:
+            self.x_center_coords.pop(0)
+            self.y_center_coords.pop(0)
+
+        # RMS-S2S metric calculation
+        precision_px = self.calculate_rms_s2s_precision(self.x_center_coords, self.y_center_coords)
+        precision_deg = self.pixels_to_degrees(precision_px)
+
+        status = "good" if precision_deg < self.precision_cutoff_degrees else "poor"
+        points_collected = len(self.x_center_coords)
+
+        print(f"Coordinates: X={x_center:.2f}, Y={y_center:.2f} | Last {points_collected} points | Precision: {precision_deg:.2f}° (RMS-S2S) | Status: {status}")
+        return {"status": status, "precision_degrees": float(precision_deg), "precision_pixels": float(precision_px), "points_collected": points_collected}
+
+# Initialize with standard 0.5 degrees cutoff
+quality_monitor_instance = QualityMonitor(window_size=50, precision_cutoff_degrees=1.0)
