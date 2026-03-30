@@ -1,5 +1,6 @@
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
+import numpy as np
 
 # Local imports from app
 from app.routes import session as session_route
@@ -77,3 +78,24 @@ def batch_predict():
     if request.method == 'POST':
         return session_route.batch_predict()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
+
+from app.services.quality_monitor import quality_monitor_instance
+
+@app.route('/api/realtime-validation', methods=['POST', 'OPTIONS'])
+def realtime_validation():
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        data = request.get_json()
+        prediction = data.get('prediction')
+
+        # Delegate the actual processing logic and state management to the service
+        result = quality_monitor_instance.process_prediction(prediction)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        print(f"Server Error: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
