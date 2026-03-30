@@ -73,9 +73,9 @@ class QualityMonitor:
         points_collected = len(self.x_center_coords)
 
         if should_print:
-            print(f"Coordinates: X={x_center:.2f}, Y={y_center:.2f} | Last {points_collected} points | Precision: {precision_deg:.2f}° (RMS-S2S) | Status: {status}")
+            print(f"Coordinates: X={x_center:.2f}, Y={y_center:.2f} | Precision: {precision_deg:.2f}° (RMS-S2S) | Status: {status}")
             
         return {"status": status, "precision_degrees": float(precision_deg), "precision_pixels": float(precision_px), "points_collected": points_collected}
 
 # Initialize with standard 0.5 degrees cutoff
-quality_monitor_instance = QualityMonitor(window_size=50, precision_cutoff_degrees=1.0)
+quality_monitor_instance = QualityMonitor(window_size=50, precision_cutoff_degrees=0.5)
