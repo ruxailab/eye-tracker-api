@@ -41,7 +41,7 @@ class QualityMonitor:
         rms_s2s_px = np.sqrt(np.mean(distances**2))
         return rms_s2s_px
 
-    def process_prediction(self, prediction):
+    def process_prediction(self, prediction, should_print=True):
 
         if not prediction or len(prediction) == 0:
             return {"status": "no_prediction"}
@@ -72,7 +72,9 @@ class QualityMonitor:
         status = "good" if precision_deg < self.precision_cutoff_degrees else "poor"
         points_collected = len(self.x_center_coords)
 
-        print(f"Coordinates: X={x_center:.2f}, Y={y_center:.2f} | Last {points_collected} points | Precision: {precision_deg:.2f}° (RMS-S2S) | Status: {status}")
+        if should_print:
+            print(f"Coordinates: X={x_center:.2f}, Y={y_center:.2f} | Last {points_collected} points | Precision: {precision_deg:.2f}° (RMS-S2S) | Status: {status}")
+            
         return {"status": status, "precision_degrees": float(precision_deg), "precision_pixels": float(precision_px), "points_collected": points_collected}
 
 # Initialize with standard 0.5 degrees cutoff
