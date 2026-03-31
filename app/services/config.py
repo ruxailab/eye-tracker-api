@@ -2,56 +2,18 @@
 hyperparameters = {
     "Lasso Regression": {
         "param_grid": {
-            "lasso__alpha": [
-                1e-15,
-                1e-10,
-                1e-8,
-                1e-3,
-                1e-2,
-                1e-1,
-                0.5,
-                1,
-                5,
-                10,
-                20,
-                30,
-                35,
-                40,
-                45,
-                50,
-                55,
-                100,
-            ]
+            "lasso__alpha": [10, 20, 30, 40, 45, 50, 55, 100, 200, 500]
         }
     },
     "Ridge Regression": {
         "param_grid": {
-            "ridge__alpha": [
-                1e-15,
-                1e-10,
-                1e-8,
-                1e-3,
-                1e-2,
-                1e-1,
-                0.5,
-                1,
-                5,
-                10,
-                20,
-                30,
-                35,
-                40,
-                45,
-                50,
-                55,
-                100,
-            ]
+            "ridge__alpha": [ 1e-3, 0.005, 0.01, 0.1, 0.5, 1.0, 10, 20, 50, 100]
         }
     },
     "Elastic Net": {
         "param_grid": {
-            "elasticnet__alpha": [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0, 100.0],
-            "elasticnet__l1_ratio": [0, 0.01, 0.2, 0.5, 0.8, 1],
+            "elasticnet__alpha": [0.1, 0.5, 1.0, 2.0, 5.0],
+            "elasticnet__l1_ratio": [0.5, 0.7, 0.8, 0.9, 1.0],
         }
     },
     "Bayesian Ridge": {
@@ -62,17 +24,24 @@ hyperparameters = {
     },
     "SGD Regressor": {
         "param_grid": {
-            "sgdregressor__alpha": [0.0001, 0.001, 0.01, 0.1],
-            "sgdregressor__l1_ratio": [0, 0.2, 0.5, 0.7, 1],
-            "sgdregressor__max_iter": [500, 1000],
-            "sgdregressor__eta0": [0.0001, 0.001, 0.01],
+            "sgdregressor__alpha": [0.0001, 0.001],
+            "sgdregressor__l1_ratio": [0.5, 0.7, 0.8, 1],
+            "sgdregressor__max_iter": [1000],
+            "sgdregressor__eta0": [0.0001, 0.001],
         }
     },
     "Support Vector Regressor": {
         "param_grid": {
-            "svr__C": [0.1, 1, 10, 100, 1000],
-            "svr__gamma": [0.0001, 0.001, 0.01, 0.1, 1],
-            "svr__kernel": ["linear", "rbf", "poly"],
+            "svr__C": [50, 100, 200, 500, 1000, 2000],
+            "svr__gamma": [0.1, 0.5, 1, 2, 5],
+            "svr__kernel": ["rbf"],
+        }
+    },
+    "Random Forest Regressor": {
+        "param_grid": {
+            "randomforestregressor__n_estimators": [100],
+            "randomforestregressor__max_depth": [10],
+            "randomforestregressor__min_samples_split": [2, 5, 10],
         }
     },
 }

@@ -1,5 +1,7 @@
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
+import pandas as pd
+from app.services.metrics import EyeTrackingBenchmark
 
 # Local imports from app
 from app.routes import session as session_route
@@ -77,3 +79,63 @@ def batch_predict():
     if request.method == 'POST':
         return session_route.batch_predict()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
+
+"""
+POST /api/session/benchmark
+
+Runs eye-tracking benchmark evaluation.
+
+Expected JSON:
+{
+    "screen_width_px": int,
+    "screen_width_cm": float,
+    "viewing_distance_cm": float,
+    "samples": [
+        {
+            "True X": float,
+            "True Y": float,
+            "Predicted X": float,
+            "Predicted Y": float
+        }
+    ]
+}
+"""
+"""
+POST /api/session/benchmark
+
+Evaluates eye-tracking accuracy and precision.
+"""
+@app.route('/api/session/benchmark', methods=['POST'])
+def run_benchmark():
+    try:
+        data = request.get_json()
+
+        required_keys = {
+            "samples",
+            "screen_width_px",
+            "screen_width_cm",
+            "viewing_distance_cm"
+        }
+
+        if not required_keys.issubset(data.keys()):
+            missing = required_keys - set(data.keys())
+            return jsonify({"error": f"Missing fields: {missing}"}), 400
+
+        df = pd.DataFrame(data["samples"])
+
+        benchmark = EyeTrackingBenchmark(
+            df=df,
+            screen_width_px=data["screen_width_px"],
+            screen_width_cm=data["screen_width_cm"],
+            viewing_distance_cm=data["viewing_distance_cm"]
+        )
+
+        results = {
+            "overall": benchmark.evaluate(),
+            "per_target": benchmark.evaluate_per_target()
+        }
+
+        return jsonify(results), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

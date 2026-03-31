@@ -22,6 +22,9 @@ from app.models.session import Session
 # from app.services import database as db
 from app.services import gaze_tracker
 
+# Import utility for generating benchmark PDF reports
+from app.services.benchmark.report_generator import generate_benchmark_report
+
 
 # Constants
 ALLOWED_EXTENSIONS = {"txt", "webm"}
@@ -56,7 +59,11 @@ def convert_nan_to_none(obj):
         return float(obj) if isinstance(obj, np.floating) else int(obj)
     return obj
 
-
+# ------------------------------------------------------------------
+# Calibration endpoint
+# Generates training CSV files from calibration points and runs the
+# gaze prediction model to compute calibration results.
+# ------------------------------------------------------------------
 
 
 def calib_results():
@@ -147,6 +154,12 @@ def calib_results():
     data = convert_nan_to_none(data)
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
+
+# ------------------------------------------------------------------
+# Batch prediction endpoint
+# Uses stored calibration data to predict gaze positions for new
+# iris tracking samples sent from the client.
+# ------------------------------------------------------------------
 def batch_predict():
     try:
         data = request.get_json()
@@ -194,3 +207,134 @@ def batch_predict():
         print("Erro batch_predict:", e)
         traceback.print_exc()
         return Response("Erro interno", status=500)
+
+# ------------------------------------------------------------------
+# Benchmark evaluation endpoint
+#
+# Endpoint:
+#   POST /api/session/<session_id>/benchmark
+#
+# Computes benchmark metrics for eye-tracking predictions including:
+# - Accuracy metrics
+# - Precision metrics
+# - Per-target analysis
+#
+# Also warns if the number of samples is small (<30) since metrics
+# like p95 error may be statistically unreliable.
+# ------------------------------------------------------------------
+@app.route('/api/session/<session_id>/benchmark', methods=['POST'])
+def run_benchmark(session_id):
+    try:
+        data = request.get_json()
+
+        samples = data.get("samples")
+
+        if not samples:
+            return jsonify({"error": "Missing samples"}), 400
+
+        # Convert to DataFrame
+        df = pd.DataFrame(samples)
+
+        # Minimum sample validation
+        if len(df) < 30:
+            warning = "Sample size is small; metrics may be statistically unreliable"
+        else:
+            warning = None
+
+        # Get session metadata
+        session = Session.get(session_id)
+
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+
+        screen_width_px = session.get("screen_width_px")
+        screen_width_cm = session.get("screen_width_cm")
+        viewing_distance_cm = session.get("viewing_distance_cm")
+
+        # Import benchmark module
+        from app.services.calib_validation.metrics import EyeTrackingBenchmark
+
+        benchmark = EyeTrackingBenchmark(
+            df=df,
+            screen_width_px=screen_width_px,
+            screen_width_cm=screen_width_cm,
+            viewing_distance_cm=viewing_distance_cm
+        )
+
+        results = {
+            "overall": benchmark.evaluate(),
+            "per_target": benchmark.evaluate_per_target()
+        }
+
+        if warning:
+            results["warning"] = warning
+
+        return jsonify(convert_nan_to_none(results)), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ------------------------------------------------------------------
+# Benchmark report generation endpoint
+#
+# Endpoint:
+#   POST /api/session/<session_id>/benchmark/report
+#
+# Generates a downloadable PDF report summarizing benchmark results
+# and visualizing true vs predicted gaze points.
+# ------------------------------------------------------------------
+@app.route('/api/session/<session_id>/benchmark/report', methods=['POST'])
+def benchmark_report(session_id):
+    try:
+        data = request.get_json()
+        samples = data.get("samples")
+
+        if not samples:
+            return jsonify({"error": "Missing samples"}), 400
+
+        # Convert samples to DataFrame
+        df = pd.DataFrame(samples)
+
+        # Retrieve session metadata (screen + device parameters)
+        session = Session.get(session_id)
+
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+
+        screen_width_px = session.get("screen_width_px")
+        screen_width_cm = session.get("screen_width_cm")
+        viewing_distance_cm = session.get("viewing_distance_cm")
+
+        # Import benchmark evaluator
+        from app.services.calib_validation.metrics import EyeTrackingBenchmark
+
+        # Run benchmark evaluation
+        benchmark = EyeTrackingBenchmark(
+            df=df,
+            screen_width_px=screen_width_px,
+            screen_width_cm=screen_width_cm,
+            viewing_distance_cm=viewing_distance_cm
+        )
+
+        results = {
+            "overall": benchmark.evaluate(),
+            "per_target": benchmark.evaluate_per_target()
+        }
+
+        # Path where the report will be saved
+        report_path = f"reports/{session_id}_benchmark_report.pdf"
+
+        # Generate the PDF report
+        generate_benchmark_report(
+            samples,
+            results["overall"]["accuracy"],
+            report_path
+        )
+
+        # Return generated file
+        return send_file(report_path, as_attachment=True)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
