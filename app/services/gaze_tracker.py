@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-
+import time
 
 # Model imports
 from sklearn import linear_model
@@ -127,9 +127,12 @@ def train_and_predict(model_name, X_train, y_train, X_test, y_test, label):
     """
     if model_name == "Linear Regression":
         model = models[model_name]
+        start_time = time.time()
         model.fit(X_train, y_train)
+        end_time = time.time()
         y_pred = model.predict(X_test)
         print(f"Score {label}: {r2_score(y_test, y_pred)}")
+        print(f"Time {label}: {end_time - start_time}")
         return y_pred
     else:
         pipeline = models[model_name]
@@ -142,9 +145,12 @@ def train_and_predict(model_name, X_train, y_train, X_test, y_test, label):
             refit="r2",
             return_train_score=True,
         )
+        start_time = time.time()
         grid_search.fit(X_train, y_train)
+        end_time = time.time()
         best_model = grid_search.best_estimator_
         y_pred = best_model.predict(X_test)
+        print(f"Time {label}: {end_time - start_time}")
         return y_pred
 
 
@@ -238,32 +244,25 @@ def predict(data, k, model_X, model_Y):
 
     # Create a dictionary to store the data
     data = {}
+    grouped = df_data.groupby("True XY")
 
-    # Iterate over the dataframe and store the data
-    for index, row in df_data.iterrows():
+    for (true_x, true_y), group in grouped:
 
-        # Get the outer and inner keys
-        outer_key = str(row["True X"]).split(".")[0]
-        inner_key = str(row["True Y"]).split(".")[0]
+        # keys
+        outer_key = str(true_x).split(".")[0]
+        inner_key = str(true_y).split(".")[0]
 
-        # If the outer key is not in the dictionary, add it
+        # create outer key if missing
         if outer_key not in data:
             data[outer_key] = {}
 
-        # Add the data to the dictionary
+        # fill data
         data[outer_key][inner_key] = {
-            "predicted_x": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted X"].values.tolist(),
-            "predicted_y": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted Y"].values.tolist(),
-            "PrecisionSD": precision_xy[(row["True X"], row["True Y"])],
-            "Accuracy": accuracy_xy[(row["True X"], row["True Y"])],
+            "predicted_x": group["Predicted X"].tolist(),
+            "predicted_y": group["Predicted Y"].tolist(),
+            "PrecisionSD": precision_xy[(true_x, true_y)],
+            "Accuracy": accuracy_xy[(true_x, true_y)],
         }
-
     # Centroids of the clusters
     data["centroids"] = model.cluster_centers_.tolist()
 
