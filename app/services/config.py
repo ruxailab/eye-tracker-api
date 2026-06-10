@@ -32,9 +32,9 @@ hyperparameters = {
     },
     "Support Vector Regressor": {
         "param_grid": {
-            "svr__C": [50, 100, 200, 500, 1000, 2000],
-            "svr__gamma": [0.1, 0.5, 1, 2, 5],
-            "svr__kernel": ["rbf"],
+            "svr__C": [1, 10 ],
+            "svr__gamma": [ 0.01, 0.1],
+            "svr__kernel": ["linear", "rbf", "poly"],
         }
     },
     "Random Forest Regressor": {

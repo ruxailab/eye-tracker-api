@@ -27,8 +27,11 @@ from sklearn.metrics import (
 )
 
 
-# Get all the files in the data directory
-data_dir = rf"C:\Users\SITAM MEUR\Desktop\web-eye-tracker-main\web-eye-tracker-main\app\services\calib_validation\csv\data"
+# Get the data directory (relative to this file's location)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(current_dir, "calib_validation", "csv", "data")
+
+# Get all files in the data directory
 files = os.listdir(data_dir)
 
 # Extract the prefixes from the file names
@@ -47,12 +50,14 @@ st.subheader("Select from your collected data")
 prefix = st.selectbox("Select the prefix for the calibration data", prefixes)
 
 # Load the dataset
-dataset_train_path = rf"C:\Users\SITAM MEUR\Desktop\web-eye-tracker-main\web-eye-tracker-main\app\services\calib_validation\csv\data\{prefix}_fixed_train_data.csv"
+dataset_train_path = os.path.join(data_dir, f"{prefix}_fixed_train_data.csv")
 try:
     raw_dataset = pd.read_csv(dataset_train_path)
+    st.success(f"Loaded: {prefix}_fixed_train_data.csv")
 # File not found error handling
 except FileNotFoundError:
     st.error("File not found. Please make sure the file path is correct.")
+    st.stop()
 
 
 def model_for_mouse_x(X1, Y1, models, model_names):
@@ -68,7 +73,7 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     Returns: None
     """
     # Split dataset into train and test sets (80/20 where 20 is for test)
-    X1_train, X1_test, Y1_train, Y1_test = train_test_split(X1, Y1, test_size=0.2)
+    X1_train, X1_test, Y1_train, Y1_test = train_test_split(X1, Y1, test_size=0.2, random_state=42)
 
     metrics_list = []
 
@@ -116,7 +121,7 @@ def model_for_mouse_x(X1, Y1, models, model_names):
 
     # Display metrics using Streamlit
     st.subheader("Metrics for the test set - X")
-    st.dataframe(metrics_df_test, use_container_width=True)
+    st.dataframe(metrics_df_test, width="stretch")
 
     # Bar charts for visualization
     for metric in metrics_df_test.columns[1:]:
@@ -141,7 +146,7 @@ def model_for_mouse_x(X1, Y1, models, model_names):
     errors_df["Error"] = errors_df["Actual"] - errors_df["Predicted"]
 
     # Create the box plot
-    st.dataframe(errors_df, use_container_width=True)
+    st.dataframe(errors_df, width="stretch")
     fig = px.box(errors_df, x="Model", y="Error")
     st.plotly_chart(fig)
 
@@ -189,7 +194,7 @@ def model_for_mouse_y(X2, Y2, models, model_names):
     Returns: None
     """
     # Split dataset into train and test sets (80/20 where 20 is for test)
-    X2_train, X2_test, Y2_train, Y2_test = train_test_split(X2, Y2, test_size=0.2)
+    X2_train, X2_test, Y2_train, Y2_test = train_test_split(X2, Y2, test_size=0.2, random_state=42)
 
     # Initialize empty lists to store the metrics data
     metrics_list = []
@@ -238,7 +243,7 @@ def model_for_mouse_y(X2, Y2, models, model_names):
 
     # Display metrics using Streamlit
     st.subheader("Metrics for the test set - Y")
-    st.dataframe(metrics_df_test, use_container_width=True)
+    st.dataframe(metrics_df_test, width="stretch")
 
     # Bar charts for visualization
     for metric in metrics_df_test.columns[1:]:
@@ -263,7 +268,7 @@ def model_for_mouse_y(X2, Y2, models, model_names):
     errors_df["Error"] = errors_df["Actual"] - errors_df["Predicted"]
 
     # Create the box plot
-    st.dataframe(errors_df, use_container_width=True)
+    st.dataframe(errors_df, width="stretch")
     fig = px.box(errors_df, x="Model", y="Error")
     st.plotly_chart(fig)
 
@@ -307,7 +312,7 @@ tab1, tab2 = st.tabs(["Raw Data", "Metrics"])
 with tab1:
     # Display the raw dataset
     st.subheader("Data Obtained from Calibration")
-    st.dataframe(raw_dataset, use_container_width=True)
+    st.dataframe(raw_dataset, width="stretch")
 
     # Two columns for the plots
     col1, col2 = st.columns(2)
@@ -327,7 +332,7 @@ with tab1:
         )
 
         # Display the plot
-        st.plotly_chart(fig_left, theme="streamlit", use_container_width=True)
+        st.plotly_chart(fig_left, theme="streamlit", width="stretch")
 
     with col2:
         # Subheader
@@ -343,7 +348,7 @@ with tab1:
         )
 
         # Display the plot
-        st.plotly_chart(fig_right, theme="streamlit", use_container_width=True)
+        st.plotly_chart(fig_right, theme="streamlit", width="stretch")
 
     # Create the line plot
     fig3 = px.line(
@@ -352,7 +357,7 @@ with tab1:
         title="Left and Right Iris Position",
     )
     # Display the plot
-    st.plotly_chart(fig3, theme="streamlit", use_container_width=True)
+    st.plotly_chart(fig3, theme="streamlit", width="stretch")
 
 
 # With the second tab
