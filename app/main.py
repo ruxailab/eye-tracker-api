@@ -7,6 +7,14 @@ from app.routes import session as session_route
 from dotenv import load_dotenv
 load_dotenv()
 
+from app.services.quality_monitor import quality_monitor_instance
+import logging
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+realtime_request_count = 0
+
 # Initialize Flask app and enable CORS
 app = Flask(__name__)
 CORS(app)
@@ -79,14 +87,6 @@ def batch_predict():
     if request.method == 'POST':
         return session_route.batch_predict()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
-
-from app.services.quality_monitor import quality_monitor_instance
-import logging
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-realtime_request_count = 0
 
 @app.route('/api/realtime-validation', methods=['POST', 'OPTIONS'])
 def realtime_validation():
