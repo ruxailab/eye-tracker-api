@@ -116,7 +116,6 @@ scoring = {
     "mae": make_scorer(mean_absolute_error),
 }
 
-
 def squash(v, limit=1.0):
     """Squash não-linear estilo WebGazer"""
     return np.tanh(v / limit)
@@ -241,7 +240,6 @@ def predict(data, k, model_X, model_Y):
     # Calculate the average accuracy (eculidian distance)
     accuracy_xy = df_data.groupby("True XY").apply(func_total_accuracy)
     
-
     # Create a dictionary to store the data
     data = {}
     grouped = df_data.groupby("True XY")
@@ -268,7 +266,6 @@ def predict(data, k, model_X, model_Y):
 
     # Return the data
     return data
-
 
 def predict_new_data_simple(
     calib_csv_path,
@@ -414,10 +411,13 @@ def predict_new_data_simple(
     
     y_pred_y = y_pred_y * Y_GAIN
 
+
     # ============================
     # PREDICTION LOOP (WebGazer)
     # ============================
     predictions = []
+    window_size = 30
+
 
     for i in range(len(y_pred_x)):
         # baseline dinâmico

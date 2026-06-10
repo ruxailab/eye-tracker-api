@@ -1,10 +1,19 @@
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
+import numpy as np
 
 # Local imports from app
 from app.routes import session as session_route
 from dotenv import load_dotenv
 load_dotenv()
+
+from app.services.quality_monitor import quality_monitor_instance
+import logging
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+realtime_request_count = 0
 
 # Initialize Flask app and enable CORS
 app = Flask(__name__)
@@ -78,3 +87,28 @@ def batch_predict():
     if request.method == 'POST':
         return session_route.batch_predict()
     return Response('Invalid request method for route', status=405, mimetype='application/json')
+
+@app.route('/api/realtime-validation', methods=['POST', 'OPTIONS'])
+def realtime_validation():
+    global realtime_request_count
+    
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        data = request.get_json()
+        prediction = data.get('prediction')
+
+        # Increment count to throttle logs from being spammed on terminal
+        realtime_request_count += 1
+        should_print = (realtime_request_count % 30 == 0)
+
+        # Delegate the actual processing logic and state management to the service
+        result = quality_monitor_instance.process_prediction(prediction, should_print=should_print)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        print(f"Server Error: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
