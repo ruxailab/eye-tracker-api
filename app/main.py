@@ -2,59 +2,20 @@ from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 import pandas as pd
 from app.services.metrics import EyeTrackingBenchmark
+import numpy as np
 
 # Local imports from app
 from app.routes import session as session_route
+from dotenv import load_dotenv
+load_dotenv()
 
+from app.services.quality_monitor import quality_monitor_instance
+
+realtime_request_count = 0
 
 # Initialize Flask app and enable CORS
 app = Flask(__name__)
 CORS(app)
-
-
-# @app.route('/', methods=['GET'])
-# def welcome():
-#     return Response(f'Welcome to EyeLab!', status=200, mimetype='application/json')
-
-# @app.route('/api/user/sessions', methods=['GET'])
-# def get_user_sessions():
-#     # Get user sessions
-#     if request.method == 'GET':
-#         return session_route.get_user_sessions()
-
-#     return Response('Invalid request method for route', status=405, mimetype='application/json')
-
-# @app.route('/api/session', methods=['GET','POST','PATCH','DELETE'])
-# def session():
-#     # Get by ID
-#     if request.method == 'GET':
-#         return session_route.get_session_by_id()
-
-#     # Create Session
-#     elif request.method == 'POST':
-#         return session_route.create_session()
-
-#     # Delete by ID
-#     elif request.method == 'DELETE':
-#         return session_route.delete_session_by_id()
-
-#     # Update by ID
-#     elif request.method == 'PATCH':
-#         return session_route.update_session_by_id()
-
-#     return Response('Invalid request method for route', status=405, mimetype='application/json')
-
-# @app.route('/api/session/results/record', methods=['GET'])
-# def manage_recording():
-#     if request.method == 'GET':
-#         return session_route.session_results_record()
-#     return Response('Invalid request method for route', status=405, mimetype='application/json')
-
-# @app.route('/api/session/results', methods=['GET'])
-# def manage_results():
-#     if request.method == 'GET':
-#         return session_route.session_results()
-#     return Response('Invalid request method for route', status=405, mimetype='application/json')
 
 @app.route('/api/session/health', methods=['GET'])
 def health_check():
@@ -139,3 +100,28 @@ def run_benchmark():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/realtime-validation', methods=['POST', 'OPTIONS'])
+def realtime_validation():
+    global realtime_request_count
+    
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        data = request.get_json()
+        prediction = data.get('prediction')
+
+        # Increment count to throttle logs from being spammed on terminal
+        realtime_request_count += 1
+        should_print = (realtime_request_count % 30 == 0)
+
+        # Delegate the actual processing logic and state management to the service
+        result = quality_monitor_instance.process_prediction(prediction, should_print=should_print)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        print(f"Server Error: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

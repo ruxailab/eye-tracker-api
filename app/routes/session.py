@@ -6,7 +6,7 @@ import json
 import csv
 import math
 import numpy as np
-
+import uuid
 from pathlib import Path
 import os
 import pandas as pd
@@ -27,8 +27,24 @@ from app.services.benchmark.report_generator import generate_benchmark_report
 
 
 # Constants
+
 ALLOWED_EXTENSIONS = {"txt", "webm"}
 COLLECTION_NAME = "session"
+
+
+def sanitize_filename(name):
+    """Sanitize a user-provided filename to prevent path traversal attacks.
+
+    Strips directory components and allows only alphanumeric characters,
+    hyphens, underscores, and dots. Raises ValueError if the result is empty.
+    """
+    # Take only the final path component to strip any directory traversal
+    name = os.path.basename(name)
+    # Allow only safe characters
+    name = re.sub(r'[^a-zA-Z0-9_\-.]', '', name)
+    if not name:
+        raise ValueError("Invalid filename")
+    return name
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -68,7 +84,7 @@ def convert_nan_to_none(obj):
 
 def calib_results():
     from_ruxailab = json.loads(request.form['from_ruxailab'])
-    file_name = json.loads(request.form['file_name'])
+    file_name = sanitize_filename(json.loads(request.form['file_name']))
     fixed_points = json.loads(request.form['fixed_circle_iris_points'])
     calib_points = json.loads(request.form['calib_circle_iris_points'])
     screen_height = json.loads(request.form['screen_height'])
@@ -140,12 +156,13 @@ def calib_results():
                 "screen_width": screen_width,
                 "k": k
             }
-
-            RUXAILAB_WEBHOOK_URL = "https://receivecalibration-ffptzpxikq-uc.a.run.app"
+            
+            FUNCTIONS_ENDPOINT_URL = os.getenv('FUNCTIONS_ENDPOINT_URL')
+            FUNCTIONS_ENDPOINT_URL+='/receiveCalibration'    
 
             print("file_name:", file_name)
 
-            resp = requests.post(RUXAILAB_WEBHOOK_URL, json=payload)
+            resp = requests.post(FUNCTIONS_ENDPOINT_URL, json=payload)
             print("Enviado para RuxaiLab:", resp.status_code, resp.text)
         except Exception as e:
             print("Erro ao enviar para RuxaiLab:", e)
@@ -166,16 +183,18 @@ def batch_predict():
         iris_data = data["iris_tracking_data"]
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
-        model_X = data.get("model_X", "Linear Regression")
-        model_Y = data.get("model_Y", "Linear Regression")
+        model_name_X = data.get("model_name_X", "Linear Regression")
+        model_name_Y = data.get("model_name_Y", "Linear Regression")
         calib_id = data.get("calib_id")
 
         if not calib_id:
             return Response("Missing calib_id", status=400)
 
+        calib_id = sanitize_filename(calib_id)
+
         base_path = Path().absolute() / "app/services/calib_validation/csv/data"
         calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / "temp_batch_predict.csv"
+        predict_csv_path = base_path / f"temp_batch_predict_{uuid.uuid4().hex}.csv"
 
         # CSV temporário
         with open(predict_csv_path, "w", newline="") as csvfile:
@@ -195,12 +214,13 @@ def batch_predict():
             calib_csv_path=calib_csv_path,
             predict_csv_path=predict_csv_path,
             iris_data=iris_data,
-            # model_X="Random Forest Regressor",
-            # model_Y="Random Forest Regressor",
+            model_name_X=model_name_X,
+            model_name_Y=model_name_Y,
             screen_width=screen_width,
             screen_height=screen_height,
         )
-
+        os.remove(predict_csv_path)
+        
         return jsonify(convert_nan_to_none(result))
 
     except Exception as e:

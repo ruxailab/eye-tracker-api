@@ -70,25 +70,61 @@ models = {
     )
 )}
 
+models_gaze_engineered = {
+    "Linear Regression": make_pipeline(
+        StandardScaler(),
+        linear_model.LinearRegression()
+    ),
+    "Ridge Regression": make_pipeline(
+        StandardScaler(),
+        linear_model.Ridge()
+    ),
+    "Lasso Regression": make_pipeline(
+        StandardScaler(),
+        linear_model.Lasso()
+    ),
+    "Elastic Net": make_pipeline(
+        StandardScaler(),
+        linear_model.ElasticNet(alpha=1.0, l1_ratio=0.5)
+    ),
+    "Bayesian Ridge": make_pipeline(
+        StandardScaler(),
+        linear_model.BayesianRidge()
+    ),
+    "SGD Regressor": make_pipeline(
+        StandardScaler(),
+        linear_model.SGDRegressor()
+    ),
+    "Support Vector Regressor": make_pipeline(
+        StandardScaler(),
+        SVR(kernel="linear")
+    ),
+    "Random Forest Regressor": make_pipeline(
+        StandardScaler(),
+        RandomForestRegressor(
+            n_estimators=200,
+            max_depth=10,
+            min_samples_split=5,
+            random_state=42
+        )
+    )
+}
+
 # Set the scoring metrics for GridSearchCV to r2_score and mean_absolute_error
 scoring = {
     "r2": make_scorer(r2_score),
     "mae": make_scorer(mean_absolute_error),
 }
 
-
 def squash(v, limit=1.0):
     """Squash não-linear estilo WebGazer"""
     return np.tanh(v / limit)
 
-def trian_and_predict(model_name, X_train, y_train, X_test, y_test, label):
+def train_and_predict(model_name, X_train, y_train, X_test, y_test, label):
     """
     Helper to train a model (with or without GridSearchCV) and return predictions.
     """
-    if (
-        model_name == "Linear Regression"
-        or model_name == "Random Forest Regressor"
-    ):
+    if model_name == "Linear Regression":
         model = models[model_name]
         start_time = time.time()
         model.fit(X_train, y_train)
@@ -166,7 +202,7 @@ def predict(data, k, model_X, model_Y):
     X_train_x = scaler_x.fit_transform(X_train_x)
     X_test_x  = scaler_x.transform(X_test_x)
     
-    y_pred_x = trian_and_predict(model_X, X_train_x, y_train_x, X_test_x, y_test_x, "X")
+    y_pred_x = train_and_predict(model_X, X_train_x, y_train_x, X_test_x, y_test_x, "X")
     
     # Scaling (fit on train only)
     scaler_y = StandardScaler()
@@ -174,7 +210,7 @@ def predict(data, k, model_X, model_Y):
     X_test_y  = scaler_y.transform(X_test_y)
 
     
-    y_pred_y = trian_and_predict(model_Y, X_train_y, y_train_y, X_test_y, y_test_y, "Y")
+    y_pred_y = train_and_predict(model_Y, X_train_y, y_train_y, X_test_y, y_test_y, "Y")
     
     # Convert the predictions to a numpy array and apply KMeans clustering
     data = np.array([y_pred_x, y_pred_y]).T
@@ -204,49 +240,42 @@ def predict(data, k, model_X, model_Y):
     # Calculate the average accuracy (eculidian distance)
     accuracy_xy = df_data.groupby("True XY").apply(func_total_accuracy)
     
-
     # Create a dictionary to store the data
     data = {}
+    grouped = df_data.groupby("True XY")
 
-    # Iterate over the dataframe and store the data
-    for index, row in df_data.iterrows():
+    for (true_x, true_y), group in grouped:
 
-        # Get the outer and inner keys
-        outer_key = str(row["True X"]).split(".")[0]
-        inner_key = str(row["True Y"]).split(".")[0]
+        # keys
+        outer_key = str(true_x).split(".")[0]
+        inner_key = str(true_y).split(".")[0]
 
-        # If the outer key is not in the dictionary, add it
+        # create outer key if missing
         if outer_key not in data:
             data[outer_key] = {}
 
-        # Add the data to the dictionary
+        # fill data
         data[outer_key][inner_key] = {
-            "predicted_x": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted X"].values.tolist(),
-            "predicted_y": df_data[
-                (df_data["True X"] == row["True X"])
-                & (df_data["True Y"] == row["True Y"])
-            ]["Predicted Y"].values.tolist(),
-            "PrecisionSD": precision_xy[(row["True X"], row["True Y"])],
-            "Accuracy": accuracy_xy[(row["True X"], row["True Y"])],
+            "predicted_x": group["Predicted X"].tolist(),
+            "predicted_y": group["Predicted Y"].tolist(),
+            "PrecisionSD": precision_xy[(true_x, true_y)],
+            "Accuracy": accuracy_xy[(true_x, true_y)],
         }
-
     # Centroids of the clusters
     data["centroids"] = model.cluster_centers_.tolist()
 
     # Return the data
     return data
 
-
 def predict_new_data_simple(
     calib_csv_path,
     predict_csv_path,
     iris_data,
+    model_name_X="Linear Regression",
+    model_name_Y="Linear Regression",
     screen_width=None,
     screen_height=None,
-):
+):  
     # ============================
     # CONFIG (WebGazer-inspired)
     # ============================
@@ -317,8 +346,9 @@ def predict_new_data_simple(
     # ============================
     # MODELS
     # ============================
-    model_x = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
-    model_y = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
+
+    model_x=models_gaze_engineered.get(model_name_X,models_gaze_engineered['Linear Regression'])
+    model_y=models.get(model_name_Y,models['Linear Regression'])
 
     model_x.fit(X_train_x, y_train_x)
     model_y.fit(X_train_y, y_train_y)
@@ -381,10 +411,13 @@ def predict_new_data_simple(
     
     y_pred_y = y_pred_y * Y_GAIN
 
+
     # ============================
     # PREDICTION LOOP (WebGazer)
     # ============================
     predictions = []
+    window_size = 30
+
 
     for i in range(len(y_pred_x)):
         # baseline dinâmico
