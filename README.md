@@ -85,35 +85,6 @@ flask run
 ```
 
 
-### **Additional Notes**
-- If you face issues running `flask run`, try:
-
-  ```sh
-  python -m flask run
-  ```
-- If Flask is not installed, install it manually:
-
-  ```sh
-  pip install flask
-  ```
-- On **Windows**, if `venv\Scripts\activate` doesn't work, **run PowerShell as Administrator** and enable scripts:
-
-  ```sh
-  Set-ExecutionPolicy Unrestricted -Scope Process
-  ```
-
-## 🧑‍🤝‍🧑 Contributing
-
-Anyone is free to contribute to this project. Just do a pull request with your code and if it is all good we will accept it. You can also help us look for bugs if you find anything that creates an issue.
-To see the full list of contributions, check out the ahead commits of the "develop" branch concerning the "main" branch. Full logs of the project development can be found in the [Daily Work Progress](https://docs.google.com/document/d/1RjCnGjYYgPKvFUrN8hSjPX29aayWr6eEopeCN3QZwEQ/edit?usp=sharing) file. Hoping to see your name in the list of contributors soon! 🚀
-
-
-## 📃 License
-
-This software is under the [MIT License](https://opensource.org/licenses/MIT).
-
-Copyright 2021 Uramaki Lab
-
 ## **Deployment**
 
 - **Files:** use the environment files to configure deployments: `.env` and `.env.production` (keep secrets out of the repo).
@@ -157,3 +128,33 @@ Run locally with `.env` or `.env.production`:
 
 This script sources the selected env file and runs the app via `python wsgi.py`.
 Security note: never commit production credentials or service account keys. Keep `.env.production` and any secret files out of source control.
+
+
+### **Additional Notes**
+- If you face issues running `flask run`, try:
+
+  ```sh
+  python -m flask run
+  ```
+- If Flask is not installed, install it manually:
+
+  ```sh
+  pip install flask
+  ```
+- On **Windows**, if `venv\Scripts\activate` doesn't work, **run PowerShell as Administrator** and enable scripts:
+
+  ```sh
+  Set-ExecutionPolicy Unrestricted -Scope Process
+  ```
+
+## 🧑‍🤝‍🧑 Contributing
+
+Anyone is free to contribute to this project. Just do a pull request with your code and if it is all good we will accept it. You can also help us look for bugs if you find anything that creates an issue.
+To see the full list of contributions, check out the ahead commits of the "develop" branch concerning the "main" branch. Full logs of the project development can be found in the [Daily Work Progress](https://docs.google.com/document/d/1RjCnGjYYgPKvFUrN8hSjPX29aayWr6eEopeCN3QZwEQ/edit?usp=sharing) file. Hoping to see your name in the list of contributors soon! 🚀
+
+
+## 📃 License
+
+This software is under the [MIT License](https://opensource.org/licenses/MIT).
+
+Copyright 2021 Uramaki Lab
