@@ -10,7 +10,7 @@ ALLOW_UNAUTH=""
 IMAGE_NAME=""
 PROJECT_ID=""
 SERVICE_NAME=""
-ENVIRONMENT=""
+ENVIRONMENT="dev"
 REPO_NAME="cloud-run-images" # Artifact Registry repository name
 
 # Load defaults from an env file without overwriting flags already set.

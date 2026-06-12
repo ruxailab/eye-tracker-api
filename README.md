@@ -116,7 +116,7 @@ Copyright 2021 Uramaki Lab
 
 ## **Deployment**
 
-- **Files:** use the environment files to configure deployments: `.env.development` and `.env.production` (keep secrets out of the repo).
+- **Files:** use the environment files to configure deployments: `.env` and `.env.production` (keep secrets out of the repo).
 **Script:** deploy with `./deploy_cloud_run.sh` (supports `-e dev` or `-e prod`, CLI flags override env files).
 
 Quick examples:
@@ -134,16 +134,18 @@ Configuration variables (place in `.env` for local/dev or `.env.production` for 
 - `PROJECT_ID` — GCP project id
 - `REGION` — Cloud Run region (example: `europe-west6`)
 - `SERVICE_NAME` — Cloud Run service name
-- `IMAGE_NAME` — container image name (pushed to `gcr.io/PROJECT/IMAGE:timestamp`)
+- `IMAGE_NAME` — container image name (default is same as service)
 - `ALLOW_UNAUTH` — `true` or `false` (whether to allow unauthenticated access)
+
+If no `-e` value is provided, `deploy_cloud_run.sh` uses `dev` and loads `.env` by default.
 
 Files added by this project:
 
 - `deploy_cloud_run.sh` — helper script that builds with Cloud Build and deploys to Cloud Run.
-- `.env.development` — development defaults (committed).
+- `.env` — development defaults.
 - `.env.production` — production template (do not commit secrets; see `.gitignore`).
 
-Run locally with `.env.development` or `.env.production`:
+Run locally with `.env` or `.env.production`:
 
 ```bash
 # Run using development env file
