@@ -113,3 +113,45 @@ To see the full list of contributions, check out the ahead commits of the "devel
 This software is under the [MIT License](https://opensource.org/licenses/MIT).
 
 Copyright 2021 Uramaki Lab
+
+## **Deployment**
+
+- **Files:** use the environment files to configure deployments: `.env.development` and `.env.production` (keep secrets out of the repo).
+**Script:** deploy with `./deploy_cloud_run.sh` (supports `-e dev` or `-e prod`, CLI flags override env files).
+
+Quick examples:
+
+```bash
+# Deploy using development defaults in .env
+./deploy_cloud_run.sh -e dev
+
+# Deploy to production using .env.production (or override values with flags)
+./deploy_cloud_run.sh -e prod -p my-prod-project -s my-service-name -r europe-west6 -i my-image -a
+```
+
+Configuration variables (place in `.env` for local/dev or `.env.production` for prod):
+
+- `PROJECT_ID` — GCP project id
+- `REGION` — Cloud Run region (example: `europe-west6`)
+- `SERVICE_NAME` — Cloud Run service name
+- `IMAGE_NAME` — container image name (pushed to `gcr.io/PROJECT/IMAGE:timestamp`)
+- `ALLOW_UNAUTH` — `true` or `false` (whether to allow unauthenticated access)
+
+Files added by this project:
+
+- `deploy_cloud_run.sh` — helper script that builds with Cloud Build and deploys to Cloud Run.
+- `.env.development` — development defaults (committed).
+- `.env.production` — production template (do not commit secrets; see `.gitignore`).
+
+Run locally with `.env.development` or `.env.production`:
+
+```bash
+# Run using development env file
+./run_local.sh -e dev --port 3000
+
+# Run using production env file (if you have it configured locally)
+./run_local.sh -e prod --port 3000
+```
+
+This script sources the selected env file and runs the app via `python wsgi.py`.
+Security note: never commit production credentials or service account keys. Keep `.env.production` and any secret files out of source control.
