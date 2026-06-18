@@ -77,13 +77,14 @@ def convert_nan_to_none(obj):
 
 def calib_results():
     from_ruxailab = json.loads(request.form['from_ruxailab'])
+    user_id = json.loads(request.form['user_id'])
+    study_id = json.loads(request.form['study_id'])
     file_name = sanitize_filename(json.loads(request.form['file_name']))
     fixed_points = json.loads(request.form['fixed_circle_iris_points'])
     calib_points = json.loads(request.form['calib_circle_iris_points'])
     screen_height = json.loads(request.form['screen_height'])
     screen_width = json.loads(request.form['screen_width'])
-    model_X = json.loads(request.form.get('model', '"Linear Regression"'))
-    model_Y = json.loads(request.form.get('model', '"Linear Regression"'))
+    model = json.loads(request.form.get('model', '"Linear Regression"'))
     k = json.loads(request.form['k'])
 
     # Generate csv dataset of calibration points
@@ -138,13 +139,15 @@ def calib_results():
         print("I/O error")
 
     # Run prediction
-    data = gaze_tracker.predict(calib_csv_file, k, model_X, model_Y)
+    data = gaze_tracker.predict(calib_csv_file, k, model, model)
 
     if from_ruxailab:
         try:
             payload = {
                 "session_id": file_name,
-                "model": data,
+                "user_id": user_id,
+                "study_id": study_id,
+                "model": model,
                 "screen_height": screen_height,
                 "screen_width": screen_width,
                 "k": k
@@ -170,8 +173,7 @@ def batch_predict():
         iris_data = data["iris_tracking_data"]
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
-        model_name_X = data.get("model_name_X", "Linear Regression")
-        model_name_Y = data.get("model_name_Y", "Linear Regression")
+        model_name = data.get("model_name", "Linear Regression")
         calib_id = data.get("calib_id")
 
         if not calib_id:
@@ -201,8 +203,7 @@ def batch_predict():
             calib_csv_path=calib_csv_path,
             predict_csv_path=predict_csv_path,
             iris_data=iris_data,
-            model_name_X=model_name_X,
-            model_name_Y=model_name_Y,
+            model_name=model_name,
             screen_width=screen_width,
             screen_height=screen_height,
         )

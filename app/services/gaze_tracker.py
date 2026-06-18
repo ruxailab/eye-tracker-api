@@ -271,8 +271,7 @@ def predict_new_data_simple(
     calib_csv_path,
     predict_csv_path,
     iris_data,
-    model_name_X="Linear Regression",
-    model_name_Y="Linear Regression",
+    model_name="Linear Regression",
     screen_width=None,
     screen_height=None,
 ):  
@@ -347,8 +346,8 @@ def predict_new_data_simple(
     # MODELS
     # ============================
 
-    model_x=models_gaze_engineered.get(model_name_X,models_gaze_engineered['Linear Regression'])
-    model_y=models.get(model_name_Y,models['Linear Regression'])
+    model_x=models_gaze_engineered.get(model_name,models_gaze_engineered['Linear Regression'])
+    model_y=models.get(model_name,models['Linear Regression'])
 
     model_x.fit(X_train_x, y_train_x)
     model_y.fit(X_train_y, y_train_y)
