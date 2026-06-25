@@ -47,7 +47,9 @@ from app.services.config import hyperparameters
 # Machine learning models to use
 models = {
     "Linear Regression": make_pipeline(
-        PolynomialFeatures(2), linear_model.LinearRegression()
+        StandardScaler(),
+        PolynomialFeatures(2), 
+        linear_model.LinearRegression()
     ),
     "Ridge Regression": make_pipeline(PolynomialFeatures(2), linear_model.Ridge()),
     "Lasso Regression": make_pipeline(PolynomialFeatures(2), linear_model.Lasso()),
@@ -73,6 +75,7 @@ models = {
 models_gaze_engineered = {
     "Linear Regression": make_pipeline(
         StandardScaler(),
+        PolynomialFeatures(2),
         linear_model.LinearRegression()
     ),
     "Ridge Regression": make_pipeline(
@@ -195,6 +198,7 @@ def predict(data, k, model_X, model_Y):
         y_y,
         test_size=0.2,
         random_state=42,
+        stratify=df["group"]
     )
     
     # Scaling (fit on train only)
