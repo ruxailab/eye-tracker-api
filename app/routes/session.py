@@ -134,15 +134,35 @@ def convert_nan_to_none(obj):
 
 def calib_results():
     from_ruxailab = json.loads(request.form['from_ruxailab'])
-    user_id = json.loads(request.form['user_id'])
-    study_id = json.loads(request.form['study_id'])
-    file_name = sanitize_filename(json.loads(request.form['file_name']))
+    user_id = json.loads(
+        request.form.get('user_id', 'null')
+    )
+    study_id = json.loads(
+        request.form.get('study_id', 'null')
+    )
+    fallback_file_name = sanitize_filename(json.loads(request.form['file_name']))
     fixed_points = json.loads(request.form['fixed_circle_iris_points'])
     calib_points = json.loads(request.form['calib_circle_iris_points'])
     screen_height = json.loads(request.form['screen_height'])
     screen_width = json.loads(request.form['screen_width'])
     model = json.loads(request.form.get('model', '"Linear Regression"'))
     k = json.loads(request.form['k'])
+
+    timestamp = int(time.time() * 1000)
+
+    if (
+        user_id
+        and isinstance(user_id, str)
+        and user_id.strip()
+        and study_id
+        and isinstance(study_id, str)
+        and study_id.strip()
+    ):
+        file_name = sanitize_filename(
+            f"{user_id}_{study_id}_{timestamp}"
+        )
+    else:
+        file_name = fallback_file_name
 
     # Generate csv dataset of calibration points
     os.makedirs(
@@ -207,13 +227,25 @@ def calib_results():
                 "model": model,
                 "screen_height": screen_height,
                 "screen_width": screen_width,
-                "k": k
+                "k": k,
+                "fixed_points": fixed_points,
+                "calib_points": calib_points,
+                "timestamp": timestamp,
             }
             
             FUNCTIONS_ENDPOINT_URL = os.getenv('FUNCTIONS_ENDPOINT_URL')
             FUNCTIONS_ENDPOINT_URL+='/receiveCalibration'    
 
-            print("file_name:", file_name)
+            print(
+                "[calibration] sending calibration",
+                {
+                    "session_id": file_name,
+                    "user_id": user_id,
+                    "study_id": study_id,
+                    "fixed_points": len(fixed_points),
+                    "calib_points": len(calib_points),
+                }
+            )
 
             resp = requests.post(FUNCTIONS_ENDPOINT_URL, json=payload)
             print("Enviado para RuxaiLab:", resp.status_code, resp.text)
@@ -227,10 +259,15 @@ def calib_results():
 def batch_predict():
     try:
         data = request.get_json()
+
         iris_data = data["iris_tracking_data"]
+        calib_points = data["calib_points"]
+        fixed_points = data["fixed_points"]
+
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
         model_name = data.get("model_name", "Linear Regression")
+        k = data.get("k", 5)
         calib_id = data.get("calib_id")
 
         print("[eye-tracking-diagnostic] batch input", {
@@ -238,49 +275,40 @@ def batch_predict():
             "screen_height": screen_height,
             "calib_id": calib_id,
             "model_name": model_name,
-            **summarize_batch_input(iris_data, screen_width, screen_height),
+            "k": k,
+            "calib_points_count": len(calib_points),
+            "fixed_points_count": len(fixed_points),
+            **summarize_batch_input(
+                iris_data,
+                screen_width,
+                screen_height,
+            ),
         })
 
-        if not calib_id:
-            return Response("Missing calib_id", status=400)
+        if not calib_points:
+            return Response("Missing calib_points", status=400)
 
-        calib_id = sanitize_filename(calib_id)
-
-        base_path = Path().absolute() / "app/services/calib_validation/csv/data"
-        calib_csv_path = base_path / f"{calib_id}_fixed_train_data.csv"
-        predict_csv_path = base_path / f"temp_batch_predict_{uuid.uuid4().hex}.csv"
-
-        print("[eye-tracking-diagnostic] calibration artifact", {
-            "path": str(calib_csv_path),
-            "exists": calib_csv_path.exists(),
-        })
-
-        # CSV temporário
-        with open(predict_csv_path, "w", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=[
-                "left_iris_x", "left_iris_y", "right_iris_x", "right_iris_y"
-            ])
-            writer.writeheader()
-            for item in iris_data:
-                writer.writerow({
-                    "left_iris_x": item["left_iris_x"],
-                    "left_iris_y": item["left_iris_y"],
-                    "right_iris_x": item["right_iris_x"],
-                    "right_iris_y": item["right_iris_y"],
-                })
+        if not fixed_points:
+            return Response("Missing fixed_points", status=400)
 
         result = gaze_tracker.predict_new_data_simple(
-            calib_csv_path=calib_csv_path,
-            predict_csv_path=predict_csv_path,
+            fixed_points=fixed_points,
             iris_data=iris_data,
             model_name=model_name,
             screen_width=screen_width,
             screen_height=screen_height,
         )
-        os.remove(predict_csv_path)
 
-        predicted_x = [item.get("predicted_x") for item in result]
-        predicted_y = [item.get("predicted_y") for item in result]
+        predicted_x = [
+            item.get("predicted_x")
+            for item in result
+        ]
+
+        predicted_y = [
+            item.get("predicted_y")
+            for item in result
+        ]
+
         print("[eye-tracking-diagnostic] batch response", {
             "prediction_count": len(result),
             "predicted_x": summarize_numeric_values(predicted_x),
@@ -288,7 +316,7 @@ def batch_predict():
             "screen_width": screen_width,
             "screen_height": screen_height,
         })
-        
+
         return jsonify(convert_nan_to_none(result))
 
     except Exception as e:

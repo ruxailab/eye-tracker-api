@@ -272,8 +272,7 @@ def predict(data, k, model_X, model_Y):
     return data
 
 def predict_new_data_simple(
-    calib_csv_path,
-    predict_csv_path,
+    fixed_points,
     iris_data,
     model_name="Linear Regression",
     screen_width=None,
@@ -289,7 +288,7 @@ def predict_new_data_simple(
     # ============================
     # LOAD CALIBRATION
     # ============================
-    df_train = pd.read_csv(calib_csv_path)
+    df_train = pd.DataFrame(fixed_points)
 
     def diagnostic_stats(values):
         values = np.asarray(values, dtype=float)
@@ -302,7 +301,7 @@ def predict_new_data_simple(
         }
 
     print("[eye-tracking-diagnostic] calibration artifact stats", {
-        "path": str(calib_csv_path),
+        "source": "request.fixed_points",
         "rows": len(df_train),
         "screen_width": screen_width,
         "screen_height": screen_height,
@@ -501,7 +500,7 @@ def predict_new_data_simple(
             model_x_key_exists
             and model_y_key_exists
         ),
-        "calibration_artifact": str(calib_csv_path),
+        "calibration_source": "request.fixed_points",
     })
 
     # ============================
@@ -533,7 +532,7 @@ def predict_new_data_simple(
     # ============================
     # LOAD PREDICTION DATA
     # ============================
-    df_pred = pd.read_csv(predict_csv_path)
+    df_pred = pd.DataFrame(iris_data)
 
     if df_pred["left_iris_x"].mean() < df_pred["right_iris_x"].mean():
         df_pred["left_iris_x"], df_pred["right_iris_x"] = (
@@ -779,6 +778,5 @@ def predict_new_data_simple(
         )
 
     return predictions
-
 def normalizeData(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
