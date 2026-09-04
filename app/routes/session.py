@@ -1,4 +1,4 @@
-# Necesary imports
+# Necessary imports
 import os
 import re
 import time
@@ -164,12 +164,12 @@ def calib_results():
     else:
         file_name = fallback_file_name
 
-    # Generate csv dataset of calibration points
+    # Generate a CSV dataset from the calibration points
     os.makedirs(
         f"{Path().absolute()}/app/services/calib_validation/csv/data/", exist_ok=True
     )
 
-    # Generate csv of calibration points with following columns
+    # Generate a CSV file containing the calibration points with the following columns
     calib_csv_file = f"{Path().absolute()}/app/services/calib_validation/csv/data/{file_name}_fixed_train_data.csv"
     csv_columns = [
         "left_iris_x",
@@ -182,7 +182,7 @@ def calib_results():
         "screen_width",
     ]
 
-    # Save calibration points to CSV file
+    # Save the calibration points to the CSV file
     try:
         # Open CSV file
         with open(calib_csv_file, "w") as csvfile:
@@ -199,7 +199,7 @@ def calib_results():
     except IOError:
         print("I/O error")
 
-    # Generate csv of iris points of session
+    # Generate a CSV file containing the calibration iris samples
     os.makedirs(
         f"{Path().absolute()}/app/services/calib_validation/csv/data/", exist_ok=True
     )
@@ -248,9 +248,9 @@ def calib_results():
             )
 
             resp = requests.post(FUNCTIONS_ENDPOINT_URL, json=payload)
-            print("Enviado para RuxaiLab:", resp.status_code, resp.text)
+            print("Sent to RuxaiLab:", resp.status_code, resp.text)
         except Exception as e:
-            print("Erro ao enviar para RuxaiLab:", e)
+            print("Error sending to RuxaiLab:", e)
 
     # Convert NaN values to None before returning JSON
     data = convert_nan_to_none(data)
@@ -374,9 +374,9 @@ def batch_predict():
         )
 
     except Exception as e:
-        print("Erro batch_predict:", e)
+        print("Error in batch_predict:", e)
         traceback.print_exc()
-        return Response("Erro interno", status=500)
+        return Response("Internal Error", status=500)
     
 def calculate_calibration_metrics(
     fixed_points,

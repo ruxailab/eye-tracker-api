@@ -120,7 +120,7 @@ scoring = {
 }
 
 def squash(v, limit=1.0):
-    """Squash não-linear estilo WebGazer"""
+    """Non-linear squash inspired by WebGazer"""
     return np.tanh(v / limit)
 
 def train_and_predict(model_name, X_train, y_train, X_test, y_test, label):
@@ -570,22 +570,13 @@ def predict_new_data_simple(
     # ==========================================================
     # ALIGN PREDICTION DISTRIBUTION WITH CALIBRATION
     # ==========================================================
+    # The prediction data may have a different relative X distribution
+    # from the calibration data due to changes in head position or camera
+    # alignment between calibration and prediction.
     #
-    # O log mostrou:
-    #
-    # calibration rel_x:
-    #   -6.94 → +5.86
-    #
-    # prediction rel_x:
-    #   -2.78 → +15.28
-    #
-    # Isso significa que a cabeça durante a predição
-    # está deslocada em relação ao baseline da calibração.
-    #
-    # Em vez de deixar o modelo extrapolar para fora
-    # da distribuição que ele viu durante o treinamento,
-    # centralizamos a distribuição da predição.
-    #
+    # Center the prediction distribution around the calibration mean
+    # to keep the input features within the distribution observed
+    # during training and reduce unwanted extrapolation.
     prediction_rel_x_mean = float(np.mean(rel_px))
     calibration_rel_x_mean = float(np.mean(rel_x))
 
