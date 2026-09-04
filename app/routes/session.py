@@ -291,6 +291,9 @@ def batch_predict():
         if not fixed_points:
             return Response("Missing fixed_points", status=400)
 
+        # ---------------------------------------------------------
+        # Predict live/session gaze data
+        # ---------------------------------------------------------
         result = gaze_tracker.predict_new_data_simple(
             fixed_points=fixed_points,
             iris_data=iris_data,
@@ -308,6 +311,47 @@ def batch_predict():
             item.get("predicted_y")
             for item in result
         ]
+        # ---------------------------------------------------------
+        # Predict calibration samples for model evaluation
+        # ---------------------------------------------------------
+
+        calibration_result = (
+            gaze_tracker.predict_new_data_simple(
+                fixed_points=fixed_points,
+                iris_data=calib_points,
+                model_name=model_name,
+                screen_width=screen_width,
+                screen_height=screen_height,
+            )
+        )
+
+        calibration_metrics = calculate_calibration_metrics(
+            fixed_points=fixed_points,
+            calibration_result=calibration_result,
+            calib_points_count=len(calib_points),
+        )
+
+        print("[eye-tracking-diagnostic] calibration metrics", {
+            "samples": calibration_metrics["samples"],
+            "points": calibration_metrics["points"],
+            "mean_error_px": calibration_metrics["mean_error_px"],
+            "median_error_px": calibration_metrics["median_error_px"],
+            "rmse_px": calibration_metrics["rmse_px"],
+            "horizontal_mae_px": calibration_metrics[
+                "horizontal_mae_px"
+            ],
+            "vertical_mae_px": calibration_metrics[
+                "vertical_mae_px"
+            ],
+            "accuracy_50px": calibration_metrics[
+                "accuracy_50px"
+            ],
+            "accuracy_100px": calibration_metrics[
+                "accuracy_100px"
+            ],
+            "quality": calibration_metrics["quality"],
+        })
+
 
         print("[eye-tracking-diagnostic] batch response", {
             "prediction_count": len(result),
@@ -317,9 +361,302 @@ def batch_predict():
             "screen_height": screen_height,
         })
 
-        return jsonify(convert_nan_to_none(result))
+        return jsonify(
+            convert_nan_to_none({
+                "predictions": result,
+                "metrics": {
+                    "calibration": calibration_metrics,
+                    "session": {
+                        "prediction_count": len(result),
+                    },
+                },
+            })
+        )
 
     except Exception as e:
         print("Erro batch_predict:", e)
         traceback.print_exc()
         return Response("Erro interno", status=500)
+    
+def calculate_calibration_metrics(
+    fixed_points,
+    calibration_result,
+    calib_points_count,
+):
+    """
+    Calculate calibration performance metrics by comparing predictions
+    from calib_points against their corresponding fixed calibration targets.
+
+    calib_points are expected to be ordered by target point, with the
+    same number of samples collected for each calibration target.
+    """
+
+    if not fixed_points or not calibration_result:
+        return {
+            "samples": 0,
+            "points": 0,
+            "mean_error_px": None,
+            "median_error_px": None,
+            "rmse_px": None,
+            "horizontal_mae_px": None,
+            "vertical_mae_px": None,
+            "accuracy_50px": None,
+            "accuracy_100px": None,
+            "quality": "Unknown",
+            "points_detail": [],
+        }
+
+    # ---------------------------------------------------------
+    # Get unique calibration targets preserving their order.
+    # ---------------------------------------------------------
+
+    calibration_targets = []
+    seen_targets = set()
+
+    for point in fixed_points:
+        point_x = point.get("point_x")
+        point_y = point.get("point_y")
+
+        if point_x is None or point_y is None:
+            continue
+
+        target = (
+            float(point_x),
+            float(point_y),
+        )
+
+        if target not in seen_targets:
+            seen_targets.add(target)
+            calibration_targets.append(target)
+
+    if not calibration_targets:
+        return {
+            "samples": 0,
+            "points": 0,
+            "mean_error_px": None,
+            "median_error_px": None,
+            "rmse_px": None,
+            "horizontal_mae_px": None,
+            "vertical_mae_px": None,
+            "accuracy_50px": None,
+            "accuracy_100px": None,
+            "quality": "Unknown",
+            "points_detail": [],
+        }
+
+    # ---------------------------------------------------------
+    # calib_points are ordered by target point.
+    # ---------------------------------------------------------
+
+    total_predictions = min(
+        len(calibration_result),
+        calib_points_count,
+    )
+
+    point_count = len(calibration_targets)
+    samples_per_point = total_predictions // point_count
+
+    if samples_per_point <= 0:
+        return {
+            "samples": 0,
+            "points": point_count,
+            "mean_error_px": None,
+            "median_error_px": None,
+            "rmse_px": None,
+            "horizontal_mae_px": None,
+            "vertical_mae_px": None,
+            "accuracy_50px": None,
+            "accuracy_100px": None,
+            "quality": "Unknown",
+            "points_detail": [],
+        }
+
+    errors = []
+    horizontal_errors = []
+    vertical_errors = []
+
+    points_detail = []
+
+    # ---------------------------------------------------------
+    # Evaluate each calibration point independently.
+    # ---------------------------------------------------------
+
+    for point_index, (target_x, target_y) in enumerate(
+        calibration_targets
+    ):
+        start_index = point_index * samples_per_point
+        end_index = start_index + samples_per_point
+
+        point_predictions = calibration_result[
+            start_index:end_index
+        ]
+
+        point_errors = []
+        point_horizontal_errors = []
+        point_vertical_errors = []
+
+        for prediction in point_predictions:
+            predicted_x = prediction.get("predicted_x")
+            predicted_y = prediction.get("predicted_y")
+
+            if (
+                predicted_x is None
+                or predicted_y is None
+            ):
+                continue
+
+            try:
+                predicted_x = float(predicted_x)
+                predicted_y = float(predicted_y)
+
+                horizontal_error = abs(
+                    predicted_x - target_x
+                )
+
+                vertical_error = abs(
+                    predicted_y - target_y
+                )
+
+                euclidean_error = (
+                    (predicted_x - target_x) ** 2
+                    + (predicted_y - target_y) ** 2
+                ) ** 0.5
+
+                horizontal_errors.append(horizontal_error)
+                vertical_errors.append(vertical_error)
+                errors.append(euclidean_error)
+
+                point_horizontal_errors.append(
+                    horizontal_error
+                )
+                point_vertical_errors.append(
+                    vertical_error
+                )
+                point_errors.append(euclidean_error)
+
+            except (TypeError, ValueError):
+                continue
+
+        # Use the existing numeric summarizer instead of manually
+        # calculating min/max/mean/std for each error collection.
+        point_error_stats = summarize_numeric_values(
+            point_errors
+        )
+
+        point_accuracy_50 = (
+            np.mean(
+                np.asarray(point_errors) <= 50
+            ) * 100
+            if point_errors
+            else None
+        )
+
+        point_accuracy_100 = (
+            np.mean(
+                np.asarray(point_errors) <= 100
+            ) * 100
+            if point_errors
+            else None
+        )
+
+        points_detail.append({
+            "target_x": target_x,
+            "target_y": target_y,
+            "samples": len(point_errors),
+            "mean_error_px": (
+                round(point_error_stats["mean"], 2)
+                if point_error_stats["mean"] is not None
+                else None
+            ),
+            "std_error_px": (
+                round(point_error_stats["std"], 2)
+                if point_error_stats["std"] is not None
+                else None
+            ),
+            "accuracy_50px": (
+                round(float(point_accuracy_50), 2)
+                if point_accuracy_50 is not None
+                else None
+            ),
+            "accuracy_100px": (
+                round(float(point_accuracy_100), 2)
+                if point_accuracy_100 is not None
+                else None
+            ),
+        })
+
+    # ---------------------------------------------------------
+    # Global metrics
+    # ---------------------------------------------------------
+
+    error_stats = summarize_numeric_values(errors)
+    horizontal_stats = summarize_numeric_values(
+        horizontal_errors
+    )
+    vertical_stats = summarize_numeric_values(
+        vertical_errors
+    )
+
+    if not errors:
+        return {
+            "samples": 0,
+            "points": point_count,
+            "mean_error_px": None,
+            "median_error_px": None,
+            "rmse_px": None,
+            "horizontal_mae_px": None,
+            "vertical_mae_px": None,
+            "accuracy_50px": None,
+            "accuracy_100px": None,
+            "quality": "Unknown",
+            "points_detail": points_detail,
+        }
+
+    errors_array = np.asarray(errors, dtype=float)
+
+    median_error = float(np.median(errors_array))
+
+    rmse = float(
+        np.sqrt(np.mean(np.square(errors_array)))
+    )
+
+    accuracy_50 = float(
+        np.mean(errors_array <= 50) * 100
+    )
+
+    accuracy_100 = float(
+        np.mean(errors_array <= 100) * 100
+    )
+
+    mean_error = error_stats["mean"]
+
+    # ---------------------------------------------------------
+    # Calibration quality
+    # ---------------------------------------------------------
+
+    if mean_error <= 40:
+        quality = "Excellent"
+    elif mean_error <= 75:
+        quality = "Good"
+    elif mean_error <= 120:
+        quality = "Fair"
+    else:
+        quality = "Poor"
+
+    return {
+        "samples": len(errors),
+        "points": point_count,
+        "mean_error_px": round(mean_error, 2),
+        "median_error_px": round(median_error, 2),
+        "rmse_px": round(rmse, 2),
+        "horizontal_mae_px": round(
+            horizontal_stats["mean"], 2
+        ),
+        "vertical_mae_px": round(
+            vertical_stats["mean"], 2
+        ),
+        "accuracy_50px": round(accuracy_50, 2),
+        "accuracy_100px": round(accuracy_100, 2),
+        "quality": quality,
+        "points_detail": points_detail,
+    }
