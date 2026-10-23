@@ -1,0 +1,21 @@
+model_name,split_type,feature_set,mean_euclidean_error_px,median_error_px,rmse_px,accuracy_50px_pct,accuracy_100px_pct,precision_x_px,precision_y_px,precision_xy_px,train_time_ms,inference_latency_ms
+Linear Regression,stratified_80_20,engineered,115.37,113.09,121.04,2.22,35.0,84.1,77.89,81.0,5.08,1.1302
+Linear Regression,leave_one_point_out,engineered,116.18,111.97,125.0,6.33,38.67,85.04,86.15,85.6,4.92,0.9847
+Ridge Regression,stratified_80_20,engineered,115.25,112.75,120.86,2.22,33.89,83.97,78.04,81.0,6.41,0.6826
+Ridge Regression,leave_one_point_out,engineered,114.14,111.24,122.95,7.56,40.0,83.55,82.95,83.25,5.11,0.6021
+Lasso Regression,stratified_80_20,engineered,115.29,112.71,120.88,2.22,33.89,84.01,78.09,81.05,5.25,0.5014
+Lasso Regression,leave_one_point_out,engineered,114.15,111.19,122.93,7.56,40.0,83.59,82.97,83.28,6.2,0.5718
+Elastic Net,stratified_80_20,engineered,219.62,228.73,235.26,2.22,12.22,60.75,51.49,56.12,6.48,0.5311
+Elastic Net,leave_one_point_out,engineered,248.77,259.89,267.03,2.22,9.22,61.92,55.45,58.68,3.76,0.5312
+Bayesian Ridge,stratified_80_20,engineered,115.28,112.78,120.87,2.22,33.89,84.02,78.08,81.05,5.32,0.6633
+Bayesian Ridge,leave_one_point_out,engineered,114.14,111.29,122.93,7.33,40.0,83.6,82.98,83.29,6.15,0.57
+SGD Regressor,stratified_80_20,engineered,115.23,112.87,120.85,2.22,33.33,83.93,78.01,80.97,23.87,0.4149
+SGD Regressor,leave_one_point_out,engineered,114.14,111.06,122.96,7.56,39.89,83.52,82.91,83.21,35.97,0.3955
+Support Vector Regressor (Linear),stratified_80_20,engineered,132.56,131.47,145.9,8.89,32.22,73.8,67.32,70.56,39.16,0.6726
+Support Vector Regressor (Linear),leave_one_point_out,engineered,145.37,140.08,160.0,6.44,31.11,74.54,72.68,73.61,36.27,0.5953
+Support Vector Regressor (RBF),stratified_80_20,engineered,127.29,126.55,142.93,14.44,31.11,83.46,68.18,75.82,27.67,0.5767
+Support Vector Regressor (RBF),leave_one_point_out,engineered,134.45,132.34,149.27,10.67,31.56,81.52,72.42,76.97,40.23,0.5607
+Support Vector Regressor (Poly),stratified_80_20,engineered,575.95,674.33,629.45,11.11,11.11,0.56,0.2,0.38,26.11,0.4838
+Support Vector Regressor (Poly),leave_one_point_out,engineered,564.88,662.29,617.14,11.11,11.11,2.55,1.53,2.04,42.37,0.4865
+Random Forest Regressor,stratified_80_20,engineered,2.54,0.0,11.44,98.89,99.44,0.0,8.27,4.13,632.71,38.3336
+Random Forest Regressor,leave_one_point_out,engineered,8.58,0.0,44.77,96.78,97.89,0.0,39.63,19.82,718.32,73.3111
