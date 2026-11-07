@@ -264,6 +264,7 @@ def batch_predict():
         calib_points = data.get("calib_points", [])
         fixed_points = data.get("fixed_points", [])
 
+
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
         model_name = data.get("model_name", "Linear Regression")

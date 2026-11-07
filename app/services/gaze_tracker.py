@@ -185,15 +185,19 @@ def predict(data, k, model_X, model_Y):
     X_feature_y = df[["left_iris_y", "right_iris_y"]]
     y_y = df["point_y"]
     # Split data into training and testing sets then Normalize data using standard scaler
-    split = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_indices, test_indices = next(
-        split.split(X_x, X_y, groups=df["group"])
-    )
-    X_train_x, X_test_x = X_x.iloc[train_indices], X_x.iloc[test_indices]
-    y_train_x, y_test_x = X_y.iloc[train_indices], X_y.iloc[test_indices]
-    X_train_y, X_test_y = (
-        X_feature_y.iloc[train_indices],
-        X_feature_y.iloc[test_indices],
+    (
+        X_train_x, X_test_x,
+        y_train_x, y_test_x,
+        X_train_y, X_test_y,
+        y_train_y, y_test_y
+    )= train_test_split(
+        X_x,
+        X_y,
+        X_feature_y,
+        y_y,
+        test_size=0.2,
+        random_state=42,
+        stratify=df["group"]
     )
     y_train_y, y_test_y = y_y.iloc[train_indices], y_y.iloc[test_indices]
     
