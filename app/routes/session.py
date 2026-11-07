@@ -261,8 +261,9 @@ def batch_predict():
         data = request.get_json()
 
         iris_data = data["iris_tracking_data"]
-        calib_points = data["calib_points"]
-        fixed_points = data["fixed_points"]
+        calib_points = data.get("calib_points", [])
+        fixed_points = data.get("fixed_points", [])
+
 
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")

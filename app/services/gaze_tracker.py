@@ -9,7 +9,6 @@ import pandas as pd
 from pathlib import Path
 
 # Scikit-learn imports
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestRegressor
@@ -200,6 +199,7 @@ def predict(data, k, model_X, model_Y):
         random_state=42,
         stratify=df["group"]
     )
+    y_train_y, y_test_y = y_y.iloc[train_indices], y_y.iloc[test_indices]
     
     # Scaling (fit on train only)
     scaler_x = StandardScaler()

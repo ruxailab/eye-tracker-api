@@ -129,6 +129,20 @@ Run locally with `.env` or `.env.production`:
 This script sources the selected env file and runs the app via `python wsgi.py`.
 Security note: never commit production credentials or service account keys. Keep `.env.production` and any secret files out of source control.
 
+### Offline calibration benchmark
+
+Calibration CSVs can be compared without starting Flask:
+
+```sh
+python evaluate_models.py --dataset app/services/calib_validation/csv/data/01_fixed_train_data.csv --csv results.csv
+```
+
+The benchmark uses grouped validation so samples from one fixation stay in the
+same split, applies the same scaling and model selection to each axis, and
+reports pixel error, axis MAE, and prediction stability. Use
+`--feature-representation mean_diff` to compare the engineered mean/difference
+features, or `--no-tuning` for a faster deterministic run.
+
 
 ### **Additional Notes**
 - If you face issues running `flask run`, try:
