@@ -260,9 +260,23 @@ def batch_predict():
     try:
         data = request.get_json()
 
-        iris_data = data["iris_tracking_data"]
-        calib_points = data["calib_points"]
-        fixed_points = data["fixed_points"]
+        if not data:
+            return Response("Missing request body", status=400)
+
+        iris_data = data.get("iris_tracking_data")
+        calib_points = data.get("calib_points")
+        fixed_points = data.get("fixed_points")
+
+        if iris_data is None:
+            return Response("Missing iris_tracking_data", status=400)
+
+        if not calib_points:
+            return Response("Missing calib_points", status=400)
+
+        if not fixed_points:
+            return Response("Missing fixed_points", status=400)
+
+
 
         screen_width = data.get("screen_width")
         screen_height = data.get("screen_height")
@@ -285,11 +299,7 @@ def batch_predict():
             ),
         })
 
-        if not calib_points:
-            return Response("Missing calib_points", status=400)
 
-        if not fixed_points:
-            return Response("Missing fixed_points", status=400)
 
         # ---------------------------------------------------------
         # Predict live/session gaze data

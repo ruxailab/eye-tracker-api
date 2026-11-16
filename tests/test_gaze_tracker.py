@@ -133,8 +133,7 @@ def test_predict_full_pipeline(calib_csv_path):
 
 
 def test_predict_new_data(
-    calib_csv_path,
-    predict_csv_path,
+    sample_iris_points,
     sample_calib_iris_points,
 ):
     iris_data = [
@@ -143,8 +142,7 @@ def test_predict_new_data(
     ]
 
     result = predict_new_data_simple(
-        calib_csv_path=calib_csv_path,
-        predict_csv_path=predict_csv_path,
+        fixed_points=sample_iris_points,
         iris_data=iris_data,
         screen_width=1000,
         screen_height=600,
@@ -160,8 +158,7 @@ def test_predict_new_data(
 
 
 def test_predict_new_data_preserves_screen_size(
-    calib_csv_path,
-    predict_csv_path,
+    sample_iris_points,
     sample_calib_iris_points,
 ):
     iris_data = [
@@ -170,8 +167,7 @@ def test_predict_new_data_preserves_screen_size(
     ]
 
     result = predict_new_data_simple(
-        calib_csv_path=calib_csv_path,
-        predict_csv_path=predict_csv_path,
+        fixed_points=sample_iris_points,
         iris_data=iris_data,
         screen_width=1920,
         screen_height=1080,

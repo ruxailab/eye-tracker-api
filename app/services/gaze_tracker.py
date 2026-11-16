@@ -186,6 +186,13 @@ def predict(data, k, model_X, model_Y):
     X_feature_y = df[["left_iris_y", "right_iris_y"]]
     y_y = df["point_y"]
     # Split data into training and testing sets then Normalize data using standard scaler
+    group_counts = df["group"].value_counts()
+    n_classes = len(group_counts)
+    min_count = group_counts.min() if not group_counts.empty else 0
+    test_count = int(np.ceil(len(df) * 0.2))
+
+    can_stratify = (min_count >= 2) and (test_count >= n_classes) and (len(df) - test_count >= n_classes)
+
     (
         X_train_x, X_test_x,
         y_train_x, y_test_x,
@@ -198,7 +205,7 @@ def predict(data, k, model_X, model_Y):
         y_y,
         test_size=0.2,
         random_state=42,
-        stratify=df["group"]
+        stratify=df["group"] if can_stratify else None
     )
     
     # Scaling (fit on train only)
