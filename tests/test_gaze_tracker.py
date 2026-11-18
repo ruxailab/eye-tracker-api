@@ -180,3 +180,67 @@ def test_predict_new_data_preserves_screen_size(
     for p in result:
         assert p["screen_width"] == 1920
         assert p["screen_height"] == 1080
+
+
+def test_predict_new_data_simple_head_pose_invariance():
+    rng = np.random.default_rng(42)
+    W, H = 1920, 1080
+    grid = [(x, y) for x in [200, 960, 1720] for y in [150, 540, 930]]
+    fixed_points = []
+    for px, py in grid:
+        for _ in range(15):
+            nose_x = 0.50 + rng.normal(0, 0.002)
+            nose_y = 0.50 + rng.normal(0, 0.002)
+            gaze_dx = (px - W / 2) / (W / 2) * 0.03
+            gaze_dy = (py - H / 2) / (H / 2) * 0.025
+            mean_x = nose_x + gaze_dx + rng.normal(0, 0.001)
+            mean_y = nose_y + gaze_dy + rng.normal(0, 0.001)
+            fixed_points.append({
+                "left_iris_x": mean_x + 0.06,
+                "right_iris_x": mean_x - 0.06,
+                "left_iris_y": mean_y,
+                "right_iris_y": mean_y,
+                "nose_x": nose_x,
+                "nose_y": nose_y,
+                "head_yaw": (nose_x - 0.50) * 2.0,
+                "head_pitch": (nose_y - 0.50) * 2.0,
+                "head_roll": 0.0,
+                "point_x": px,
+                "point_y": py,
+            })
+
+    test_points, targets = [], []
+    for px, py in grid:
+        head_shift_x = rng.uniform(-0.06, 0.06)
+        head_shift_y = rng.uniform(-0.04, 0.04)
+        nose_x = 0.50 + head_shift_x
+        nose_y = 0.50 + head_shift_y
+        gaze_dx = (px - W / 2) / (W / 2) * 0.03
+        gaze_dy = (py - H / 2) / (H / 2) * 0.025
+        mean_x = nose_x + gaze_dx
+        mean_y = nose_y + gaze_dy
+        test_points.append({
+            "left_iris_x": mean_x + 0.06,
+            "right_iris_x": mean_x - 0.06,
+            "left_iris_y": mean_y,
+            "right_iris_y": mean_y,
+            "nose_x": nose_x,
+            "nose_y": nose_y,
+            "head_yaw": head_shift_x * 2.0,
+            "head_pitch": head_shift_y * 2.0,
+            "head_roll": 0.0,
+            "timestamp": 100,
+        })
+        targets.append((px, py))
+
+    fixed_no_nose = [{k: v for k, v in r.items() if not k.startswith(("nose_", "head_"))} for r in fixed_points]
+    test_no_nose = [{k: v for k, v in r.items() if not k.startswith(("nose_", "head_"))} for r in test_points]
+
+    pred_base = predict_new_data_simple(fixed_no_nose, test_no_nose, screen_width=W, screen_height=H)
+    pred_pose = predict_new_data_simple(fixed_points, test_points, screen_width=W, screen_height=H)
+
+    err_base = np.mean([np.hypot(p["predicted_x"] - tx, p["predicted_y"] - ty) for p, (tx, ty) in zip(pred_base, targets)])
+    err_pose = np.mean([np.hypot(p["predicted_x"] - tx, p["predicted_y"] - ty) for p, (tx, ty) in zip(pred_pose, targets)])
+
+    assert err_pose < err_base * 0.3
+    assert err_pose < 120.0
