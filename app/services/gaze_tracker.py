@@ -76,7 +76,7 @@ models_gaze_engineered = {
     "Linear Regression": make_pipeline(
         StandardScaler(),
         PolynomialFeatures(2),
-        linear_model.LinearRegression()
+        linear_model.Ridge(alpha=1.0)
     ),
     "Ridge Regression": make_pipeline(
         StandardScaler(),
@@ -161,10 +161,10 @@ def predict(data, k, model_X, model_Y):
     Predicts the gaze coordinates using machine learning models.
 
     Args:
-        - data (str): The path to the CSV file containing the training data.
-        - k (int): The number of clusters for KMeans clustering.
-        - model_X: The machine learning model to use for prediction on the X coordinate.
-        - model_Y: The machine learning model to use for prediction on the Y coordinate.
+- data (str): The path to the CSV file containing the training data.
+- k (int): The number of clusters for KMeans clustering.
+- model_X: The machine learning model to use for prediction on the X coordinate.
+- model_Y: The machine learning model to use for prediction on the Y coordinate.
 
     Returns:
         dict: A dictionary containing the predicted gaze coordinates, precision, accuracy, and cluster centroids.
@@ -286,9 +286,10 @@ def predict_new_data_simple(
     Y_GAIN = 1.2
 
     # ============================
-    # LOAD CALIBRATION
+    # LOAD CALIBRATION & PREDICTION FRAMES
     # ============================
     df_train = pd.DataFrame(fixed_points)
+    df_pred = pd.DataFrame(iris_data)
 
     def diagnostic_stats(values):
         values = np.asarray(values, dtype=float)
@@ -331,6 +332,27 @@ def predict_new_data_simple(
     y_center = screen_height / 2
 
     # ============================
+    # DETECT OPTIONAL NOSE & HEADPOSE
+    # ============================
+    has_nose = (
+        "nose_x" in df_train.columns
+        and "nose_y" in df_train.columns
+        and "nose_x" in df_pred.columns
+        and "nose_y" in df_pred.columns
+        and not df_train[["nose_x", "nose_y"]].isna().any().any()
+        and not df_pred[["nose_x", "nose_y"]].isna().any().any()
+    )
+
+    pose_cols = [
+        col for col in ["head_yaw", "head_pitch", "head_roll"]
+        if col in df_train.columns
+        and col in df_pred.columns
+        and not df_train[col].isna().any()
+        and not df_pred[col].isna().any()
+        and float(df_train[col].std()) > 0.02
+    ]
+
+    # ============================
     # ENSURE LATERALITY
     # ============================
     if df_train["left_iris_x"].mean() < df_train["right_iris_x"].mean():
@@ -346,7 +368,7 @@ def predict_new_data_simple(
         )
 
     # ============================
-    # CALIBRATION IRIS DATA
+    # CALIBRATION IRIS & NOSE DATA
     # ============================
     left_x = df_train["left_iris_x"].values.astype(float)
     right_x = df_train["right_iris_x"].values.astype(float)
@@ -358,6 +380,13 @@ def predict_new_data_simple(
 
     mean_y = (left_y + right_y) / 2
     diff_y = left_y - right_y
+
+    if has_nose:
+        train_nose_x = df_train["nose_x"].values.astype(float)
+        train_nose_y = df_train["nose_y"].values.astype(float)
+    train_pose = {
+        col: df_train[col].values.astype(float) for col in pose_cols
+    }
 
     # ============================
     # REMOVE CALIBRATION OUTLIERS
@@ -404,6 +433,12 @@ def predict_new_data_simple(
 
         point_x = df_train["point_x"].values.astype(float)[valid_mask_x]
         point_y = df_train["point_y"].values.astype(float)[valid_mask_x]
+
+        if has_nose:
+            train_nose_x = train_nose_x[valid_mask_x]
+            train_nose_y = train_nose_y[valid_mask_x]
+        for col in pose_cols:
+            train_pose[col] = train_pose[col][valid_mask_x]
     else:
         point_x = df_train["point_x"].values.astype(float)
         point_y = df_train["point_y"].values.astype(float)
@@ -455,23 +490,44 @@ def predict_new_data_simple(
     rel_y_norm = rel_y / iris_y_scale
 
     # ============================
-    # FEATURES
+    # FEATURES (IRIS + NOSE / HEADPOSE)
     # ============================
-    X_train_x = np.column_stack([
-        diff_x,
-        rel_x,
-    ])
+    if has_nose:
+        iris_nose_x = mean_x - train_nose_x
+        iris_nose_y = mean_y - train_nose_y
 
-    X_train_y = np.column_stack([
-        diff_y_norm,
-        rel_y_norm,
-    ])
+        extra_train_cols = [train_pose[col] for col in pose_cols]
+        X_train_x = np.column_stack([
+            diff_x,
+            iris_nose_x,
+            *extra_train_cols,
+        ])
+        X_train_y = np.column_stack([
+            diff_y_norm,
+            iris_nose_y / iris_y_scale,
+            *extra_train_cols,
+        ])
+        x_col_names = ["diff_x", "iris_nose_x", *pose_cols]
+        y_col_names = ["diff_y_norm", "iris_nose_y_norm", *pose_cols]
+    else:
+        X_train_x = np.column_stack([
+            diff_x,
+            rel_x,
+        ])
+        X_train_y = np.column_stack([
+            diff_y_norm,
+            rel_y_norm,
+        ])
+        x_col_names = ["diff_x", "rel_x"]
+        y_col_names = ["diff_y_norm", "rel_y_norm"]
 
     print("[eye-tracking-diagnostic] training features", {
-        "X_columns": ["diff_x", "rel_x"],
+        "has_nose": has_nose,
+        "pose_cols": pose_cols,
+        "X_columns": x_col_names,
         "X_diff_x": diagnostic_stats(X_train_x[:, 0]),
         "X_rel_x": diagnostic_stats(X_train_x[:, 1]),
-        "Y_columns": ["diff_y_norm", "rel_y_norm"],
+        "Y_columns": y_col_names,
     })
 
     # ============================
@@ -530,10 +586,8 @@ def predict_new_data_simple(
     )
 
     # ============================
-    # LOAD PREDICTION DATA
+    # PREDICTION LATERALITY
     # ============================
-    df_pred = pd.DataFrame(iris_data)
-
     if df_pred["left_iris_x"].mean() < df_pred["right_iris_x"].mean():
         df_pred["left_iris_x"], df_pred["right_iris_x"] = (
             df_pred["right_iris_x"].copy(),
@@ -568,33 +622,31 @@ def predict_new_data_simple(
     rel_py = mean_py - ref_mean_y
 
     # ==========================================================
-    # ALIGN PREDICTION DISTRIBUTION WITH CALIBRATION
+    # ALIGN PREDICTION DISTRIBUTION WITH CALIBRATION (FALLBACK)
     # ==========================================================
-    # The prediction data may have a different relative X distribution
-    # from the calibration data due to changes in head position or camera
-    # alignment between calibration and prediction.
-    #
-    # Center the prediction distribution around the calibration mean
-    # to keep the input features within the distribution observed
-    # during training and reduce unwanted extrapolation.
-    prediction_rel_x_mean = float(np.mean(rel_px))
-    calibration_rel_x_mean = float(np.mean(rel_x))
+    # When nose/head-pose landmarks are unavailable, center rel_px
+    # around the calibration mean to limit extrapolation on head shift.
+    # When nose landmarks are present, the nose-relative features
+    # directly anchor head translation and rotation.
+    if not has_nose:
+        prediction_rel_x_mean = float(np.mean(rel_px))
+        calibration_rel_x_mean = float(np.mean(rel_x))
 
-    rel_px = (
-        rel_px
-        - prediction_rel_x_mean
-        + calibration_rel_x_mean
-    )
+        rel_px = (
+            rel_px
+            - prediction_rel_x_mean
+            + calibration_rel_x_mean
+        )
 
-    print("[eye-tracking-diagnostic] rel_x alignment", {
-        "calibration_mean": calibration_rel_x_mean,
-        "prediction_mean_before": prediction_rel_x_mean,
-        "prediction_mean_after": float(np.mean(rel_px)),
-        "prediction_before": diagnostic_stats(
-            mean_px - ref_mean_x
-        ),
-        "prediction_after": diagnostic_stats(rel_px),
-    })
+        print("[eye-tracking-diagnostic] rel_x alignment", {
+            "calibration_mean": calibration_rel_x_mean,
+            "prediction_mean_before": prediction_rel_x_mean,
+            "prediction_mean_after": float(np.mean(rel_px)),
+            "prediction_before": diagnostic_stats(
+                mean_px - ref_mean_x
+            ),
+            "prediction_after": diagnostic_stats(rel_px),
+        })
 
     diff_py_norm = diff_py / iris_y_scale
     rel_py_norm = rel_py / iris_y_scale
@@ -602,21 +654,36 @@ def predict_new_data_simple(
     # ============================
     # PREDICTION FEATURES
     # ============================
-    X_pred_x = np.column_stack([
-        diff_px,
-        rel_px,
-    ])
+    if has_nose:
+        pred_nose_x = df_pred["nose_x"].values.astype(float)
+        pred_nose_y = df_pred["nose_y"].values.astype(float)
 
-    X_pred_y = np.column_stack([
-        diff_py_norm,
-        rel_py_norm,
-    ])
+        iris_nose_px = mean_px - pred_nose_x
+        iris_nose_py = mean_py - pred_nose_y
+
+        extra_pred_cols = [df_pred[col].values.astype(float) for col in pose_cols]
+        X_pred_x = np.column_stack([
+            diff_px,
+            iris_nose_px,
+            *extra_pred_cols,
+        ])
+        X_pred_y = np.column_stack([
+            diff_py_norm,
+            iris_nose_py / iris_y_scale,
+            *extra_pred_cols,
+        ])
+    else:
+        X_pred_x = np.column_stack([
+            diff_px,
+            rel_px,
+        ])
+        X_pred_y = np.column_stack([
+            diff_py_norm,
+            rel_py_norm,
+        ])
 
     print("[eye-tracking-diagnostic] X features", {
-        "column_order": [
-            "diff_x",
-            "rel_x",
-        ],
+        "column_order": x_col_names,
         "calibration": {
             "diff_x": diagnostic_stats(X_train_x[:, 0]),
             "rel_x": diagnostic_stats(X_train_x[:, 1]),
@@ -769,5 +836,7 @@ def predict_new_data_simple(
         )
 
     return predictions
+
+
 def normalizeData(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
